@@ -5,6 +5,7 @@ import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
 import { FontLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geometries/TextGeometry.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/DRACOLoader.js';
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 
@@ -20,7 +21,10 @@ renderer.toneMapping = THREE.CineonToneMapping;
 scene.fog = new THREE.FogExp2(0x02040f, 0.00042);
 
 const clock = new THREE.Clock();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://unpkg.com/three@0.180.0/examples/jsm/libs/draco/gltf/');
 const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
@@ -323,5 +327,6 @@ window.addEventListener('beforeunload', () => {
     if (Array.isArray(obj.material)) obj.material.forEach((mat) => mat.dispose?.());
     else obj.material?.dispose?.();
   });
+  dracoLoader.dispose();
   renderer.dispose();
 });
