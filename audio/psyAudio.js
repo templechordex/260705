@@ -4,6 +4,7 @@ export function createPsyAudioGraph({
   audio2URL = 'audio/roku2.mp3',
   bgmURL = 'audio/psy.mp3',
   bgmTracks = null,
+  initialBgmTrackId = null,
   reverbURL = 'audio/WireGrind2.wav',
 } = {}) {
   const actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -17,6 +18,7 @@ export function createPsyAudioGraph({
   const bgmTrackConfigs = (Array.isArray(bgmTracks) && bgmTracks.length)
     ? bgmTracks
     : [{ id: 'default', url: bgmURL }];
+  const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
   const bgmElements = bgmTrackConfigs.map((track) => {
     const element = new Audio(track.url);
     element.loop = true;
@@ -34,10 +36,10 @@ export function createPsyAudioGraph({
   Track2.connect(busTrack1);
 
   const bgmGainNodes = new Map();
-  bgmElements.forEach(({ id, element }, index) => {
+  bgmElements.forEach(({ id, element }) => {
     const source = actx.createMediaElementSource(element);
     const gain = actx.createGain();
-    gain.gain.value = index === 0 ? 1.0 : 0.0;
+    gain.gain.value = id === initialActiveBgmTrackId ? 1.0 : 0.0;
     source.connect(gain).connect(busTrack1);
     bgmGainNodes.set(id, gain);
   });
@@ -99,8 +101,15 @@ export function createPsyAudioGraph({
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
 
   function setBgmVariant(activeId, durSec = 0.85) {
+    const t0 = actx.currentTime;
     bgmGainNodes.forEach((gain, id) => {
-      rampParam(gain.gain, id === activeId ? 1.0 : 0.0, durSec);
+      const targetValue = id === activeId ? 1.0 : 0.0;
+      if (durSec <= 0) {
+        gain.gain.cancelScheduledValues(t0);
+        gain.gain.setValueAtTime(targetValue, t0);
+      } else {
+        rampParam(gain.gain, targetValue, durSec);
+      }
     });
   }
 

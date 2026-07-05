@@ -893,7 +893,8 @@ const soundVariantOptions = [
   { id: 'dry', label: 'Dry', url: 'audio/round_dry.mp3' },
   { id: 'basic', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
-let activeSoundVariant = soundVariantOptions[0].id;
+const DEFAULT_SOUND_VARIANT = 'original';
+let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
     width: 3.35,
@@ -1357,7 +1358,6 @@ const {
   audio1Element,
   audio2Element,
   psyElement,
-  bgmElements,
   setBgmVariant,
   syncBgmElements,
   playBgmElements,
@@ -1366,8 +1366,9 @@ const {
 } = createPsyAudioGraph({
   bgmURL: 'audio/round.mp3',
   bgmTracks: soundVariantOptions,
+  initialBgmTrackId: DEFAULT_SOUND_VARIANT,
 });
-setBgmVariant(activeSoundVariant, 0.01);
+setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
 psyElement.addEventListener('play', () => {
   setRoundAnimationPlaying(!psyElement.paused && !psyElement.ended);
