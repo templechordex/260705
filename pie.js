@@ -7,6 +7,7 @@ import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geome
 import { GLTFLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/DRACOLoader.js';
 import { createSceneCameraRenderer } from './core/scene.js';
+import { createLoadingManager } from './core/loadingScreen.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 
 // --------------------------------------
@@ -17,13 +18,14 @@ const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
   cameraPosition: [0, 24, 64],
   far: 4200,
 });
+const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING DOCK' });
 renderer.toneMapping = THREE.CineonToneMapping;
 scene.fog = new THREE.FogExp2(0x02040f, 0.00042);
 
 const clock = new THREE.Clock();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://unpkg.com/three@0.180.0/examples/jsm/libs/draco/gltf/');
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -31,7 +33,7 @@ const pointer = new THREE.Vector2();
 // --------------------------------------
 // Font + sign helpers (same pattern as at.js)
 // --------------------------------------
-const fontLoader = new FontLoader();
+const fontLoader = new FontLoader(loadingManager);
 let uiFont = null;
 const textMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
 const textMatCyan = new THREE.MeshBasicMaterial({ color: 0x9ff4ff });

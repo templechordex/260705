@@ -13,6 +13,7 @@ import { ShaderPass }     from 'https://unpkg.com/three@0.180.0/examples/jsm/pos
 
 import { addObjeToScene } from './atobje.js';
 import { createSceneCameraRenderer } from './core/scene.js';
+import { createLoadingManager } from './core/loadingScreen.js';
 import { animateCameraToPositionAndTarget as tweenCamera } from './core/cameraTween.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 import { createPsyAudioGraph } from './audio/psyAudio.js';
@@ -21,6 +22,7 @@ import { createPsyAudioGraph } from './audio/psyAudio.js';
 // Core: Scene / Camera / Renderer
 // --------------------------------------
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, { exposure: 0.78 });
+const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING SCENE' });
 renderer.toneMapping = THREE.CineonToneMapping;
 
 // --------------------------------------
@@ -137,13 +139,13 @@ const _v3b = new THREE.Vector3();
 const _v3c = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
 const clock = new THREE.Clock();
-const textureLoader = new THREE.TextureLoader();
-const gltfLoader = new GLTFLoader();
+const textureLoader = new THREE.TextureLoader(loadingManager);
+const gltfLoader = new GLTFLoader(loadingManager);
 
 // --------------------------------------
 // Font (unified) + text helpers
 // --------------------------------------
-const fontLoader = new FontLoader();
+const fontLoader = new FontLoader(loadingManager);
 let uiFont = null;
 
 const textMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
