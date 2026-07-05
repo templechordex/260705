@@ -14,6 +14,7 @@ import { ShaderPass }     from 'https://unpkg.com/three@0.180.0/examples/jsm/pos
 import { addObjeToScene } from './rbobje.js';
 import { createBubbles, createMenuBubbles } from './bubble.js';
 import { createSceneCameraRenderer } from './core/scene.js';
+import { createLoadingManager } from './core/loadingScreen.js';
 import { animateCameraToPositionAndTarget as tweenCamera } from './core/cameraTween.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 import { createPsyAudioGraph } from './audio/psyAudio.js';
@@ -22,6 +23,7 @@ import { createPsyAudioGraph } from './audio/psyAudio.js';
 // Core: Scene / Camera / Renderer
 // --------------------------------------
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, { exposure: 0.1 });
+const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING SCENE' });
 
 // --------------------------------------
 // Post FX
@@ -198,12 +200,12 @@ const _v3b = new THREE.Vector3();
 const _v3c = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
 const clock = new THREE.Clock();
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new THREE.TextureLoader(loadingManager);
 
 // --------------------------------------
 // Font (unified) + text helpers
 // --------------------------------------
-const fontLoader = new FontLoader();
+const fontLoader = new FontLoader(loadingManager);
 let uiFont = null;
 
 const textMatBlack = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -278,7 +280,7 @@ fontLoader.load('fonts/dela.json', (font) => {
 // --------------------------------------
 // GLTF: elephant
 // --------------------------------------
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader(loadingManager);
 let ele = null;
 gltfLoader.load('model/ele.glb', (gltf) => {
   ele = gltf.scene;
