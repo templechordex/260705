@@ -1081,7 +1081,7 @@ function buildBottomMenuTexts() {
 // PIE button animation: Three.js neon burst
 // --------------------------------------
 const pieFxGroup = new THREE.Group();
-pieFxGroup.position.set(0, 7.2, -12.8);
+pieFxGroup.position.set(signPie.position.x, signPie.position.y, -12.8);
 pieFxGroup.visible = false;
 scene.add(pieFxGroup);
 
@@ -1130,10 +1130,16 @@ for (let i = 0; i < 16; i++) {
 }
 
 let pieFxStartTime = -1;
-const pieFxDuration = 3.2;
+let pieNavigationStarted = false;
+const pieFxDuration = 3.0;
+const pieFxFullScreenScale = 18;
 
 function triggerPieAnimation() {
+  if (pieNavigationStarted) return;
+  pieNavigationStarted = true;
   pieFxStartTime = performance.now() * 0.001;
+  pieFxGroup.position.set(signPie.position.x, signPie.position.y, -12.8);
+  pieFxGroup.scale.setScalar(0.18);
   pieFxGroup.visible = true;
 }
 
@@ -1142,7 +1148,10 @@ function updatePieAnimation(nowSec) {
 
   const elapsed = nowSec - pieFxStartTime;
   const progress = Math.min(elapsed / pieFxDuration, 1);
+  const easedProgress = 1 - Math.pow(1 - progress, 3);
   const pulse = Math.sin(progress * Math.PI);
+
+  pieFxGroup.scale.setScalar(THREE.MathUtils.lerp(0.18, pieFxFullScreenScale, easedProgress));
 
   pieCore.rotation.x += 0.035;
   pieCore.rotation.y += 0.052;
@@ -1151,13 +1160,13 @@ function updatePieAnimation(nowSec) {
 
   pieRings.forEach((ring, i) => {
     ring.rotation.z += 0.012 + i * 0.01;
-    ring.scale.setScalar(0.75 + progress * (1.4 + i * 0.35));
-    ring.material.opacity = Math.max(0, (1 - progress) * 0.8);
+    ring.scale.setScalar(0.75 + easedProgress * (1.4 + i * 0.35));
+    ring.material.opacity = Math.max(0.24, (1 - progress) * 0.8);
   });
 
   pieParticles.forEach((p, i) => {
     const a = p.userData.angle + elapsed * p.userData.speed;
-    const r = p.userData.radius + progress * 2.2;
+    const r = p.userData.radius + easedProgress * 2.2;
     p.position.set(
       Math.cos(a) * r,
       Math.sin(a * 1.3 + i) * 0.9,
@@ -1165,11 +1174,10 @@ function updatePieAnimation(nowSec) {
     );
     p.scale.setScalar(0.8 + pulse * 1.6);
   });
-  pieParticleMat.opacity = Math.max(0, 1 - progress);
+  pieParticleMat.opacity = Math.max(0.15, 1 - progress);
 
   if (progress >= 1) {
-    pieFxGroup.visible = false;
-    pieFxStartTime = -1;
+    window.location.assign('./pie.html');
   }
 }
 
