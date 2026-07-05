@@ -3,6 +3,8 @@ export function createPsyAudioGraph({
   audio1URL = 'audio/roku1.mp3',
   audio2URL = 'audio/roku2.mp3',
   bgmURL = 'audio/psy.mp3',
+  bgmTracks = null,
+  initialBgmTrackId = null,
   reverbURL = 'audio/WireGrind2.wav',
 } = {}) {
   const actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -13,19 +15,34 @@ export function createPsyAudioGraph({
 
   const audio1Element = new Audio(audio1URL);
   const audio2Element = new Audio(audio2URL);
-  const psyElement = new Audio(bgmURL);
-  psyElement.loop = true;
-  psyElement.preload = 'auto';
-  psyElement.crossOrigin = 'anonymous';
+  const bgmTrackConfigs = (Array.isArray(bgmTracks) && bgmTracks.length)
+    ? bgmTracks
+    : [{ id: 'default', url: bgmURL }];
+  const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
+  const bgmElements = bgmTrackConfigs.map((track) => {
+    const element = new Audio(track.url);
+    element.loop = true;
+    element.preload = 'auto';
+    element.crossOrigin = 'anonymous';
+    return { ...track, element };
+  });
+  const psyElement = bgmElements[0].element;
 
   const Track1 = actx.createMediaElementSource(audio1Element);
   const Track2 = actx.createMediaElementSource(audio2Element);
-  const TrackBGM = actx.createMediaElementSource(psyElement);
 
   const busTrack1 = actx.createGain();
   Track1.connect(busTrack1);
   Track2.connect(busTrack1);
-  TrackBGM.connect(busTrack1);
+
+  const bgmGainNodes = new Map();
+  bgmElements.forEach(({ id, element }) => {
+    const source = actx.createMediaElementSource(element);
+    const gain = actx.createGain();
+    gain.gain.value = id === initialActiveBgmTrackId ? 1.0 : 0.0;
+    source.connect(gain).connect(busTrack1);
+    bgmGainNodes.set(id, gain);
+  });
 
   const reverb1 = actx.createConvolver();
   fetch(reverbURL)
@@ -83,6 +100,38 @@ export function createPsyAudioGraph({
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
 
+  function setBgmVariant(activeId, durSec = 0.85) {
+    const t0 = actx.currentTime;
+    bgmGainNodes.forEach((gain, id) => {
+      const targetValue = id === activeId ? 1.0 : 0.0;
+      if (durSec <= 0) {
+        gain.gain.cancelScheduledValues(t0);
+        gain.gain.setValueAtTime(targetValue, t0);
+      } else {
+        rampParam(gain.gain, targetValue, durSec);
+      }
+    });
+  }
+
+  function syncBgmElements(time = psyElement.currentTime) {
+    bgmElements.forEach(({ element }) => {
+      if (Number.isFinite(element.duration) && element.duration > 0) {
+        element.currentTime = Math.min(time, Math.max(0, element.duration - 0.05));
+      } else {
+        element.currentTime = time;
+      }
+    });
+  }
+
+  function playBgmElements() {
+    syncBgmElements(psyElement.currentTime);
+    return Promise.allSettled(bgmElements.map(({ element }) => element.play()));
+  }
+
+  function pauseBgmElements() {
+    bgmElements.forEach(({ element }) => element.pause());
+  }
+
   function setPsyAudio(isOn) {
     if (isOn) {
       rampParam(gainReverb1.gain, 0.6, 1.2);
@@ -100,6 +149,11 @@ export function createPsyAudioGraph({
     audio1Element,
     audio2Element,
     psyElement,
+    bgmElements,
+    setBgmVariant,
+    syncBgmElements,
+    playBgmElements,
+    pauseBgmElements,
     ctrLowpassFilter1,
     ctrLowpassFilter2,
     setEchoSend,
