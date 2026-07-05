@@ -4,6 +4,7 @@
 import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
 import { FontLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geometries/TextGeometry.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 
@@ -19,6 +20,7 @@ renderer.toneMapping = THREE.CineonToneMapping;
 scene.fog = new THREE.FogExp2(0x02040f, 0.00042);
 
 const clock = new THREE.Clock();
+const gltfLoader = new GLTFLoader();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
@@ -169,42 +171,64 @@ stationGroup.rotation.x = THREE.MathUtils.degToRad(8);
 // --------------------------------------
 // Dockable spaceship in holding pattern
 // --------------------------------------
+function fitModelToDockingScale(model, targetSize = 11) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const maxAxis = Math.max(size.x, size.y, size.z);
+  if (maxAxis > 0) {
+    const scale = targetSize / maxAxis;
+    model.scale.multiplyScalar(scale);
+  }
+
+  const centeredBox = new THREE.Box3().setFromObject(model);
+  const center = centeredBox.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+}
+
 function createSpaceship() {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8f7ff, metalness: 0.45, roughness: 0.2 });
-  const glassMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.62 });
-  const engineMat = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.9 });
 
-  const body = new THREE.Mesh(new THREE.ConeGeometry(2.8, 11, 32), bodyMat);
-  body.rotation.x = Math.PI / 2;
-  group.add(body);
-
-  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(1.35, 24, 16), glassMat);
-  cockpit.scale.set(1, 0.58, 0.72);
-  cockpit.position.set(0, 1.05, 0.8);
-  group.add(cockpit);
-
-  const wingGeo = new THREE.BoxGeometry(7.2, 0.32, 2.3);
-  const leftWing = new THREE.Mesh(wingGeo, bodyMat);
-  leftWing.position.set(-3.8, -0.35, -1.6);
-  leftWing.rotation.z = THREE.MathUtils.degToRad(-12);
-  group.add(leftWing);
-
-  const rightWing = leftWing.clone();
-  rightWing.position.x = 3.8;
-  rightWing.rotation.z = THREE.MathUtils.degToRad(12);
-  group.add(rightWing);
-
-  const engine = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3.2, 24), engineMat);
-  engine.rotation.x = -Math.PI / 2;
-  engine.position.z = -6.2;
-  group.add(engine);
+  gltfLoader.load('model/wpiessp.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+    fitModelToDockingScale(model);
+    model.rotation.y = Math.PI;
+    group.add(model);
+  }, undefined, (e) => console.error(e));
 
   return group;
 }
 
 const spaceship = createSpaceship();
 scene.add(spaceship);
+
+function createDistantUfo() {
+  const group = new THREE.Group();
+  group.position.set(-135, 76, -540);
+
+  gltfLoader.load('model/wpieufo.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+    fitModelToDockingScale(model, 34);
+    model.rotation.set(THREE.MathUtils.degToRad(5), THREE.MathUtils.degToRad(-32), THREE.MathUtils.degToRad(-7));
+    group.add(model);
+  }, undefined, (e) => console.error(e));
+
+  return group;
+}
+
+const distantUfo = createDistantUfo();
+scene.add(distantUfo);
 
 // --------------------------------------
 // UI: title + navigation
@@ -279,6 +303,11 @@ function animate() {
   );
   spaceship.rotation.y = -elapsed * 0.42 + Math.PI;
   spaceship.rotation.z = Math.sin(elapsed * 0.8) * 0.16;
+
+  distantUfo.position.x = -135 + Math.sin(elapsed * 0.18) * 18;
+  distantUfo.position.y = 76 + Math.sin(elapsed * 0.31) * 7;
+  distantUfo.rotation.y = elapsed * 0.08;
+  distantUfo.rotation.z = Math.sin(elapsed * 0.22) * 0.08;
 
   camera.position.x = Math.sin(elapsed * 0.12) * 5;
   camera.position.y = 24 + Math.sin(elapsed * 0.1) * 2;
