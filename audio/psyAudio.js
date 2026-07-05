@@ -152,7 +152,7 @@ export function createPsyAudioGraph({
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
 
-  function setBgmVariant(activeId, durSec = 0.85) {
+  function setBgmVariant(activeId, durSec = 1.45) {
     const t0 = actx.currentTime;
     bgmGainNodes.forEach((gain, id) => {
       const targetValue = id === activeId ? 1.0 : 0.0;

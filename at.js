@@ -894,6 +894,7 @@ const soundVariantOptions = [
   { id: 'basic', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'original';
+const SOUND_VARIANT_CROSSFADE_SEC = 1.45;
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
@@ -1189,7 +1190,7 @@ function toggleSongPlayback() {
 function selectSoundVariant(variantId) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  setBgmVariant(activeSoundVariant, 0.85);
+  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
   updateSoundVariantButtons();
   if (!psyElement.paused) syncBgmElements(psyElement.currentTime);
 }
