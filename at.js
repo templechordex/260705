@@ -251,18 +251,51 @@ const imgboxLabels = [
   { title: '1stAlbum : PARK MINDS', releaseDate: '2020.10.30' }
 ];
 const imgboxLabelMeshes = imgboxLabels.map(({ title, releaseDate }) => createMonitorLabel(title, releaseDate));
-monitorScene.add(...imgboxLabelMeshes);
+const aboutTextPlane = createMonitorAboutText();
+aboutTextPlane.visible = false;
+monitorScene.add(...imgboxLabelMeshes, aboutTextPlane);
 let currentImgIndex = 0;
+let monitorMode = 'releases';
 
 function showImgbox(index) {
   currentImgIndex = (index + imgboxes.length) % imgboxes.length; // 範囲外をループさせる
+  if (monitorMode === 'releases') {
+    showReleasesView(false);
+  }
+}
+
+function showReleasesView(syncButtonText = true) {
+  monitorMode = 'releases';
   imgboxes.forEach((box, i) => {
     box.visible = (i === currentImgIndex);
   });
   imgboxLabelMeshes.forEach((label, i) => {
     label.visible = (i === currentImgIndex);
   });
+  aboutTextPlane.visible = false;
+  if (syncButtonText) updateAboutButtonText();
 }
+
+function showAboutView() {
+  monitorMode = 'about';
+  imgboxes.forEach((box) => {
+    box.visible = false;
+  });
+  imgboxLabelMeshes.forEach((label) => {
+    label.visible = false;
+  });
+  aboutTextPlane.visible = true;
+  updateAboutButtonText();
+}
+
+function toggleMonitorMode() {
+  if (monitorMode === 'about') {
+    showReleasesView();
+  } else {
+    showAboutView();
+  }
+}
+
 showImgbox(0); // 初期表示はimgbox1
 
 function createMonitorLabel(title, releaseDate, width = 24, height = 4) {
@@ -307,6 +340,76 @@ function createMonitorLabel(title, releaseDate, width = 24, height = 4) {
   const geo = new THREE.PlaneGeometry(width, height);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(0, -7.35, 0.35);
+  mesh.userData._dispose = () => { tex.dispose(); geo.dispose(); mat.dispose(); };
+  return mesh;
+}
+
+
+function createMonitorAboutText(width = 22, height = 15) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1200;
+  canvas.height = 820;
+  const ctx2d = canvas.getContext('2d');
+
+  const gradient = ctx2d.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, 'rgba(2, 10, 20, 0.92)');
+  gradient.addColorStop(0.5, 'rgba(8, 28, 48, 0.96)');
+  gradient.addColorStop(1, 'rgba(2, 10, 20, 0.92)');
+  ctx2d.fillStyle = gradient;
+  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx2d.strokeStyle = '#66ddff';
+  ctx2d.lineWidth = 10;
+  ctx2d.shadowColor = '#66ddff';
+  ctx2d.shadowBlur = 34;
+  ctx2d.strokeRect(28, 28, canvas.width - 56, canvas.height - 56);
+  ctx2d.shadowBlur = 0;
+
+  ctx2d.textAlign = 'center';
+  ctx2d.textBaseline = 'middle';
+  ctx2d.fillStyle = '#f8fdff';
+  ctx2d.font = 'bold 82px sans-serif';
+  ctx2d.fillText('ANJI TERAOKA', canvas.width / 2, 125);
+
+  ctx2d.fillStyle = '#9feeff';
+  ctx2d.font = 'bold 44px sans-serif';
+  ctx2d.fillText('ABOUT', canvas.width / 2, 195);
+
+  ctx2d.textAlign = 'left';
+  ctx2d.fillStyle = '#f8fdff';
+  ctx2d.font = '38px sans-serif';
+  const lines = [
+    'Anji Teraoka is an artist creating music',
+    'and visual worlds with a psychedelic,',
+    'dreamlike sense of color.',
+    '',
+    'This monitor shows releases, artwork,',
+    'and fragments from the project archive.',
+    '',
+    'Click RELEASES to return to the discography.'
+  ];
+  const startX = 115;
+  let y = 300;
+  lines.forEach((line) => {
+    if (!line) {
+      y += 42;
+      return;
+    }
+    ctx2d.fillText(line, startX, y);
+    y += 58;
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const geo = new THREE.PlaneGeometry(width, height);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, 0, 0.4);
   mesh.userData._dispose = () => { tex.dispose(); geo.dispose(); mat.dispose(); };
   return mesh;
 }
@@ -1068,15 +1171,28 @@ function buildBackTopText() {
 }
 
 let signAboutText = null;
+let signReleasesText = null;
 let signPieText = null;
 function buildBottomMenuTexts() {
   if (!uiFont) return;
   if (!signAboutText) {
     signAboutText = attachSignText(signAbout, 'ABOUT', 0.5, textMatWhite, 0.05);
   }
+  if (!signReleasesText) {
+    signReleasesText = attachSignText(signAbout, 'RELEASES', 0.38, textMatWhite, 0.05);
+    signReleasesText.visible = false;
+  }
   if (!signPieText) {
     signPieText = attachSignText(signPie, 'PIE', 0.5, textMatWhite, 0.05);
   }
+  updateAboutButtonText();
+}
+
+function updateAboutButtonText() {
+  if (!signAboutText || !signReleasesText) return;
+  const isAboutView = monitorMode === 'about';
+  signAboutText.visible = !isAboutView;
+  signReleasesText.visible = isAboutView;
 }
 
 // --------------------------------------
@@ -1232,6 +1348,7 @@ const clickableA = [
   signPlaySound,
   signSongBack,
   signBackTop,
+  signAbout,
   signPie,
   buttonLeft,
   buttonRight
@@ -1261,11 +1378,11 @@ function handleClick(event) {
     const obj = getClickableRoot(intersects1[0].object);
 
     if (obj === buttonLeft) {
-      showImgbox(currentImgIndex - 1);
+      if (monitorMode === 'releases') showImgbox(currentImgIndex - 1);
       handled = true;
 
     } else if (obj === buttonRight) {
-      showImgbox(currentImgIndex + 1);
+      if (monitorMode === 'releases') showImgbox(currentImgIndex + 1);
       handled = true;
 
     } else if (obj === signNewSong) {
@@ -1279,6 +1396,10 @@ function handleClick(event) {
 
     } else if (obj === signSongBack) {
       closeNewSongView();
+      handled = true;
+
+    } else if (obj === signAbout) {
+      toggleMonitorMode();
       handled = true;
 
     } else if (obj === signPie) {
