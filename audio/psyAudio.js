@@ -89,10 +89,62 @@ export function createPsyAudioGraph({
   lowpassFilter2.type = 'lowpass';
   lowpassFilter2.frequency.value = 0;
 
+  const isIOSAudio = /iP(ad|hone|od)/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const manualRampTokens = new WeakMap();
+
+  function cancelParamAutomation(param, time) {
+    if (typeof param.cancelAndHoldAtTime === 'function') {
+      param.cancelAndHoldAtTime(time);
+    } else {
+      param.cancelScheduledValues(time);
+      param.setValueAtTime(param.value, time);
+    }
+  }
+
+  function manuallyRampParam(param, targetValue, durationSec) {
+    const token = Symbol('manualRamp');
+    manualRampTokens.set(param, token);
+    const startValue = param.value;
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (manualRampTokens.get(param) !== token) return;
+      const progress = Math.min((nowMs - startMs) / durationMs, 1);
+      const value = startValue + (targetValue - startValue) * progress;
+      param.setValueAtTime(value, actx.currentTime);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        param.setValueAtTime(targetValue, actx.currentTime);
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
   function rampParam(param, targetValue, durationSec) {
     const t0 = actx.currentTime;
-    param.cancelScheduledValues(t0);
-    param.setValueAtTime(param.value, t0);
+    if (durationSec <= 0) {
+      manualRampTokens.delete(param);
+      param.cancelScheduledValues(t0);
+      param.setValueAtTime(targetValue, t0);
+      return;
+    }
+
+    if (isIOSAudio) {
+      // iOS Safari can miss AudioParam linearRamp automation on MediaElement gain
+      // nodes during user-triggered playback. A short rAF-driven ramp keeps BGM
+      // crossfades audible and smooth on iPhone/iPad while preserving desktop
+      // sample-accurate automation elsewhere.
+      param.cancelScheduledValues(t0);
+      manuallyRampParam(param, targetValue, durationSec);
+      return;
+    }
+
+    manualRampTokens.delete(param);
+    cancelParamAutomation(param, t0);
     param.linearRampToValueAtTime(targetValue, t0 + Math.max(0.001, durationSec));
   }
 
@@ -105,6 +157,7 @@ export function createPsyAudioGraph({
     bgmGainNodes.forEach((gain, id) => {
       const targetValue = id === activeId ? 1.0 : 0.0;
       if (durSec <= 0) {
+        manualRampTokens.delete(gain.gain);
         gain.gain.cancelScheduledValues(t0);
         gain.gain.setValueAtTime(targetValue, t0);
       } else {
