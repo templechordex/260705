@@ -207,6 +207,29 @@ function createSpaceship() {
 const spaceship = createSpaceship();
 scene.add(spaceship);
 
+function createDistantUfo() {
+  const group = new THREE.Group();
+  group.position.set(-135, 76, -540);
+
+  gltfLoader.load('model/wpieufo.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+    fitModelToDockingScale(model, 34);
+    model.rotation.set(THREE.MathUtils.degToRad(5), THREE.MathUtils.degToRad(-32), THREE.MathUtils.degToRad(-7));
+    group.add(model);
+  }, undefined, (e) => console.error(e));
+
+  return group;
+}
+
+const distantUfo = createDistantUfo();
+scene.add(distantUfo);
+
 // --------------------------------------
 // UI: title + navigation
 // --------------------------------------
@@ -280,6 +303,11 @@ function animate() {
   );
   spaceship.rotation.y = -elapsed * 0.42 + Math.PI;
   spaceship.rotation.z = Math.sin(elapsed * 0.8) * 0.16;
+
+  distantUfo.position.x = -135 + Math.sin(elapsed * 0.18) * 18;
+  distantUfo.position.y = 76 + Math.sin(elapsed * 0.31) * 7;
+  distantUfo.rotation.y = elapsed * 0.08;
+  distantUfo.rotation.z = Math.sin(elapsed * 0.22) * 0.08;
 
   camera.position.x = Math.sin(elapsed * 0.12) * 5;
   camera.position.y = 24 + Math.sin(elapsed * 0.1) * 2;
