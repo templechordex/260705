@@ -884,6 +884,50 @@ soundProgressFill.position.z = 0.02;
 soundProgressFill.scale.x = 0.0001;
 soundProgressGroup.add(soundProgressFill);
 
+
+// --------------------------------------
+// SOUND source switch (above playback position bar)
+// --------------------------------------
+const soundVariantOptions = [
+  { id: 'original', label: 'Original', url: 'audio/round.mp3' },
+  { id: 'dry', label: 'Dry', url: 'audio/round_dry.mp3' },
+  { id: 'basic', label: 'Basic', url: 'audio/round_roomy.mp3' },
+];
+const DEFAULT_SOUND_VARIANT = 'original';
+const SOUND_VARIANT_CROSSFADE_SEC = 1.45;
+let activeSoundVariant = DEFAULT_SOUND_VARIANT;
+const soundVariantButtons = soundVariantOptions.map((option, index) => {
+  const button = createSignBoardPlane({
+    width: 3.35,
+    height: 1.15,
+    bg: 'rgba(8,18,32,0.42)',
+    glow: index === 0 ? '#ff66cc' : '#66ddff',
+  });
+  button.position.set(
+    signPlaySound.position.x + (index - 1) * 3.7,
+    signPlaySound.position.y + 8.05,
+    signPlaySound.position.z + 0.2
+  );
+  button.userData.soundVariantId = option.id;
+  scene.add(button);
+  return button;
+});
+let soundVariantTexts = [];
+function updateSoundVariantButtons() {
+  soundVariantButtons.forEach((button) => {
+    const active = button.userData.soundVariantId === activeSoundVariant;
+    button.material.opacity = active ? 0.86 : 0.54;
+    button.scale.setScalar(active ? 1.06 : 1.0);
+  });
+}
+function buildSoundVariantTexts() {
+  if (!uiFont || soundVariantTexts.length) return;
+  soundVariantTexts = soundVariantButtons.map((button, index) => (
+    attachSignText(button, soundVariantOptions[index].label, 0.22, textMatWhite, 0.05)
+  ));
+}
+updateSoundVariantButtons();
+
 function updateSoundProgressBar() {
   const duration = Number.isFinite(psyElement.duration) ? psyElement.duration : 0;
   const progress = duration > 0 ? THREE.MathUtils.clamp(psyElement.currentTime / duration, 0, 1) : 0;
@@ -1137,10 +1181,18 @@ function closeNewSongView() {
 function toggleSongPlayback() {
   if (actx.state !== 'running') actx.resume();
   if (psyElement.paused) {
-    psyElement.play().catch(console.warn);
+    playBgmElements().catch(console.warn);
   } else {
-    psyElement.pause();
+    pauseBgmElements();
   }
+}
+
+function selectSoundVariant(variantId) {
+  if (!soundVariantOptions.some((option) => option.id === variantId)) return;
+  activeSoundVariant = variantId;
+  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
+  updateSoundVariantButtons();
+  if (!psyElement.paused) syncBgmElements(psyElement.currentTime);
 }
 
 // --------------------------------------
@@ -1307,8 +1359,17 @@ const {
   audio1Element,
   audio2Element,
   psyElement,
+  setBgmVariant,
+  syncBgmElements,
+  playBgmElements,
+  pauseBgmElements,
   setPsyAudio,
-} = createPsyAudioGraph({ bgmURL: 'audio/round.mp3' });
+} = createPsyAudioGraph({
+  bgmURL: 'audio/round.mp3',
+  bgmTracks: soundVariantOptions,
+  initialBgmTrackId: DEFAULT_SOUND_VARIANT,
+});
+setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
 psyElement.addEventListener('play', () => {
   setRoundAnimationPlaying(!psyElement.paused && !psyElement.ended);
@@ -1351,7 +1412,8 @@ const clickableA = [
   signAbout,
   signPie,
   buttonLeft,
-  buttonRight
+  buttonRight,
+  ...soundVariantButtons
 ];
 const clickableSet = new Set(clickableA);
 
@@ -1377,7 +1439,11 @@ function handleClick(event) {
   if (intersects1.length) {
     const obj = getClickableRoot(intersects1[0].object);
 
-    if (obj === buttonLeft) {
+    if (soundVariantButtons.includes(obj)) {
+      selectSoundVariant(obj.userData.soundVariantId);
+      handled = true;
+
+    } else if (obj === buttonLeft) {
       if (monitorMode === 'releases') showImgbox(currentImgIndex - 1);
       handled = true;
 
@@ -1421,6 +1487,7 @@ document.addEventListener('click', handleClick);
 function tryBuildAllLabels() {
   buildNewSongText();
   buildPlaySoundText();
+  buildSoundVariantTexts();
   buildBackTopText();
   buildBottomMenuTexts();
 }
@@ -1490,7 +1557,7 @@ tryBuildAllLabels();
 // Cleanup on unload
 // --------------------------------------
 function disposeScene() {
-  try { psyElement.pause(); } catch {}
+  try { pauseBgmElements(); } catch {}
   try { audio1Element.pause(); audio2Element.pause(); } catch {}
   disposeRoundVisual();
   scene.traverse((obj) => {
