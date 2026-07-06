@@ -3,6 +3,8 @@ export function createPsyAudioGraph({
   audio1URL = 'audio/roku1.mp3',
   audio2URL = 'audio/roku2.mp3',
   bgmURL = 'audio/psy.mp3',
+  bgmTracks = null,
+  initialBgmTrackId = null,
   reverbURL = 'audio/WireGrind2.wav',
 } = {}) {
   const actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -13,19 +15,33 @@ export function createPsyAudioGraph({
 
   const audio1Element = new Audio(audio1URL);
   const audio2Element = new Audio(audio2URL);
-  const psyElement = new Audio(bgmURL);
-  psyElement.loop = true;
-  psyElement.preload = 'auto';
-  psyElement.crossOrigin = 'anonymous';
+  const bgmTrackConfigs = (Array.isArray(bgmTracks) && bgmTracks.length)
+    ? bgmTracks
+    : [{ id: 'default', url: bgmURL }];
+  const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
+  const bgmElements = bgmTrackConfigs.map((track) => {
+    const element = new Audio(track.url);
+    element.loop = true;
+    element.preload = 'auto';
+    element.crossOrigin = 'anonymous';
+    element.volume = track.id === initialActiveBgmTrackId ? 1.0 : 0.0;
+    return { ...track, element };
+  });
+  const psyElement = bgmElements[0].element;
 
   const Track1 = actx.createMediaElementSource(audio1Element);
   const Track2 = actx.createMediaElementSource(audio2Element);
-  const TrackBGM = actx.createMediaElementSource(psyElement);
 
   const busTrack1 = actx.createGain();
   Track1.connect(busTrack1);
   Track2.connect(busTrack1);
-  TrackBGM.connect(busTrack1);
+
+  bgmElements.forEach(({ element }) => {
+    const source = actx.createMediaElementSource(element);
+    const gain = actx.createGain();
+    gain.gain.value = 1.0;
+    source.connect(gain).connect(busTrack1);
+  });
 
   const reverb1 = actx.createConvolver();
   fetch(reverbURL)
@@ -72,16 +88,124 @@ export function createPsyAudioGraph({
   lowpassFilter2.type = 'lowpass';
   lowpassFilter2.frequency.value = 0;
 
+  const isIOSAudio = /iP(ad|hone|od)/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const manualRampTokens = new WeakMap();
+
+  function cancelParamAutomation(param, time) {
+    if (typeof param.cancelAndHoldAtTime === 'function') {
+      param.cancelAndHoldAtTime(time);
+    } else {
+      param.cancelScheduledValues(time);
+      param.setValueAtTime(param.value, time);
+    }
+  }
+
+  function manuallyRampParam(param, targetValue, durationSec) {
+    const token = Symbol('manualRamp');
+    manualRampTokens.set(param, token);
+    const startValue = param.value;
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (manualRampTokens.get(param) !== token) return;
+      const progress = Math.min((nowMs - startMs) / durationMs, 1);
+      const value = startValue + (targetValue - startValue) * progress;
+      param.setValueAtTime(value, actx.currentTime);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        param.setValueAtTime(targetValue, actx.currentTime);
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
   function rampParam(param, targetValue, durationSec) {
     const t0 = actx.currentTime;
-    param.cancelScheduledValues(t0);
-    param.setValueAtTime(param.value, t0);
+    if (durationSec <= 0) {
+      manualRampTokens.delete(param);
+      param.cancelScheduledValues(t0);
+      param.setValueAtTime(targetValue, t0);
+      return;
+    }
+
+    if (isIOSAudio) {
+      // iOS Safari can miss AudioParam linearRamp automation on MediaElement gain
+      // nodes during user-triggered playback. A short rAF-driven ramp keeps BGM
+      // crossfades audible and smooth on iPhone/iPad while preserving desktop
+      // sample-accurate automation elsewhere.
+      param.cancelScheduledValues(t0);
+      manuallyRampParam(param, targetValue, durationSec);
+      return;
+    }
+
+    manualRampTokens.delete(param);
+    cancelParamAutomation(param, t0);
     param.linearRampToValueAtTime(targetValue, t0 + Math.max(0.001, durationSec));
   }
 
   const ctrLowpassFilter1 = (freq, dur) => rampParam(lowpassFilter1.frequency, freq, dur);
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
+
+  const bgmVolumeFadeTokens = new WeakMap();
+
+  function fadeElementVolume(element, targetValue, durationSec) {
+    const clampedTarget = Math.min(1, Math.max(0, targetValue));
+    if (durationSec <= 0) {
+      bgmVolumeFadeTokens.delete(element);
+      element.volume = clampedTarget;
+      return;
+    }
+
+    const token = Symbol('bgmVolumeFade');
+    bgmVolumeFadeTokens.set(element, token);
+    const startValue = element.volume;
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (bgmVolumeFadeTokens.get(element) !== token) return;
+      const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
+      const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+      element.volume = startValue + (clampedTarget - startValue) * easedProgress;
+      if (rawProgress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        element.volume = clampedTarget;
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  function setBgmVariant(activeId, durSec = 1.45) {
+    bgmElements.forEach(({ id, element }) => {
+      fadeElementVolume(element, id === activeId ? 1.0 : 0.0, durSec);
+    });
+  }
+
+  function syncBgmElements(time = psyElement.currentTime) {
+    bgmElements.forEach(({ element }) => {
+      if (Number.isFinite(element.duration) && element.duration > 0) {
+        element.currentTime = Math.min(time, Math.max(0, element.duration - 0.05));
+      } else {
+        element.currentTime = time;
+      }
+    });
+  }
+
+  function playBgmElements() {
+    syncBgmElements(psyElement.currentTime);
+    return Promise.allSettled(bgmElements.map(({ element }) => element.play()));
+  }
+
+  function pauseBgmElements() {
+    bgmElements.forEach(({ element }) => element.pause());
+  }
 
   function setPsyAudio(isOn) {
     if (isOn) {
@@ -100,6 +224,11 @@ export function createPsyAudioGraph({
     audio1Element,
     audio2Element,
     psyElement,
+    bgmElements,
+    setBgmVariant,
+    syncBgmElements,
+    playBgmElements,
+    pauseBgmElements,
     ctrLowpassFilter1,
     ctrLowpassFilter2,
     setEchoSend,
