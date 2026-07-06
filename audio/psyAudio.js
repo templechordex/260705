@@ -20,6 +20,8 @@ export function createPsyAudioGraph({
     : [{ id: 'default', url: bgmURL }];
   const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
   let activeBgmTrackId = initialActiveBgmTrackId;
+  const OPEN_LOWPASS_FREQ = 20000;
+  const MUTED_LOWPASS_FREQ = 10;
   const bgmElements = bgmTrackConfigs.map((track) => {
     const element = new Audio(track.url);
     element.loop = true;
@@ -40,10 +42,15 @@ export function createPsyAudioGraph({
 
   bgmElements.forEach((track) => {
     const source = actx.createMediaElementSource(track.element);
+    const filter = actx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = track.id === activeBgmTrackId ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+    filter.Q.value = 0.0001;
     const gain = actx.createGain();
-    gain.gain.value = track.id === activeBgmTrackId ? 1.0 : 0.0;
+    gain.gain.value = 1.0;
+    track.filter = filter;
     track.gain = gain;
-    source.connect(gain).connect(busTrack1);
+    source.connect(filter).connect(gain).connect(busTrack1);
   });
 
   const reverb1 = actx.createConvolver();
@@ -198,8 +205,10 @@ export function createPsyAudioGraph({
 
   function fadeBgmTrack(track, targetValue, durationSec) {
     track.element.volume = 1.0;
-    if (track.gain) {
-      rampParam(track.gain.gain, targetValue, durationSec);
+    if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
+    if (track.filter) {
+      const targetFrequency = targetValue > 0 ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+      rampParam(track.filter.frequency, targetFrequency, durationSec);
       return Promise.resolve();
     }
     return fadeElementVolume(track.element, targetValue, durationSec);
@@ -240,7 +249,10 @@ export function createPsyAudioGraph({
     const playPromises = bgmElements.map((track) => {
       const active = track.element === activeElement;
       track.element.volume = 1.0;
-      if (track.gain) track.gain.gain.setValueAtTime(active ? 1.0 : 0.0, actx.currentTime);
+      if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
+      if (track.filter) {
+        track.filter.frequency.setValueAtTime(active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, actx.currentTime);
+      }
       return track.element.play();
     });
     return Promise.allSettled(playPromises);
