@@ -24,6 +24,7 @@ export function createPsyAudioGraph({
     element.loop = true;
     element.preload = 'auto';
     element.crossOrigin = 'anonymous';
+    element.volume = track.id === initialActiveBgmTrackId ? 1.0 : 0.0;
     return { ...track, element };
   });
   const psyElement = bgmElements[0].element;
@@ -35,13 +36,11 @@ export function createPsyAudioGraph({
   Track1.connect(busTrack1);
   Track2.connect(busTrack1);
 
-  const bgmGainNodes = new Map();
-  bgmElements.forEach(({ id, element }) => {
+  bgmElements.forEach(({ element }) => {
     const source = actx.createMediaElementSource(element);
     const gain = actx.createGain();
-    gain.gain.value = id === initialActiveBgmTrackId ? 1.0 : 0.0;
+    gain.gain.value = 1.0;
     source.connect(gain).connect(busTrack1);
-    bgmGainNodes.set(id, gain);
   });
 
   const reverb1 = actx.createConvolver();
@@ -152,17 +151,40 @@ export function createPsyAudioGraph({
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
 
-  function setBgmVariant(activeId, durSec = 1.45) {
-    const t0 = actx.currentTime;
-    bgmGainNodes.forEach((gain, id) => {
-      const targetValue = id === activeId ? 1.0 : 0.0;
-      if (durSec <= 0) {
-        manualRampTokens.delete(gain.gain);
-        gain.gain.cancelScheduledValues(t0);
-        gain.gain.setValueAtTime(targetValue, t0);
+  const bgmVolumeFadeTokens = new WeakMap();
+
+  function fadeElementVolume(element, targetValue, durationSec) {
+    const clampedTarget = Math.min(1, Math.max(0, targetValue));
+    if (durationSec <= 0) {
+      bgmVolumeFadeTokens.delete(element);
+      element.volume = clampedTarget;
+      return;
+    }
+
+    const token = Symbol('bgmVolumeFade');
+    bgmVolumeFadeTokens.set(element, token);
+    const startValue = element.volume;
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (bgmVolumeFadeTokens.get(element) !== token) return;
+      const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
+      const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+      element.volume = startValue + (clampedTarget - startValue) * easedProgress;
+      if (rawProgress < 1) {
+        requestAnimationFrame(step);
       } else {
-        rampParam(gain.gain, targetValue, durSec);
+        element.volume = clampedTarget;
       }
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  function setBgmVariant(activeId, durSec = 1.45) {
+    bgmElements.forEach(({ id, element }) => {
+      fadeElementVolume(element, id === activeId ? 1.0 : 0.0, durSec);
     });
   }
 
