@@ -19,13 +19,14 @@ export function createPsyAudioGraph({
     ? bgmTracks
     : [{ id: 'default', url: bgmURL }];
   const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
+  let activeBgmTrackId = initialActiveBgmTrackId;
   const bgmElements = bgmTrackConfigs.map((track) => {
     const element = new Audio(track.url);
     element.loop = true;
     element.preload = 'auto';
     element.crossOrigin = 'anonymous';
-    element.volume = track.id === initialActiveBgmTrackId ? 1.0 : 0.0;
-    return { ...track, element };
+    element.volume = track.id === activeBgmTrackId ? 1.0 : 0.0;
+    return { ...track, element, gain: null };
   });
   const psyElement = bgmElements[0].element;
 
@@ -36,10 +37,11 @@ export function createPsyAudioGraph({
   Track1.connect(busTrack1);
   Track2.connect(busTrack1);
 
-  bgmElements.forEach(({ element }) => {
-    const source = actx.createMediaElementSource(element);
+  bgmElements.forEach((track) => {
+    const source = actx.createMediaElementSource(track.element);
     const gain = actx.createGain();
-    gain.gain.value = 1.0;
+    gain.gain.value = track.id === activeBgmTrackId ? 1.0 : 0.0;
+    track.gain = gain;
     source.connect(gain).connect(busTrack1);
   });
 
@@ -158,37 +160,76 @@ export function createPsyAudioGraph({
     if (durationSec <= 0) {
       bgmVolumeFadeTokens.delete(element);
       element.volume = clampedTarget;
-      return;
+      return Promise.resolve();
     }
 
-    const token = Symbol('bgmVolumeFade');
-    bgmVolumeFadeTokens.set(element, token);
-    const startValue = element.volume;
-    const startMs = performance.now();
-    const durationMs = Math.max(1, durationSec * 1000);
+    return new Promise((resolve) => {
+      const token = Symbol('bgmVolumeFade');
+      bgmVolumeFadeTokens.set(element, token);
+      const startValue = element.volume;
+      const startMs = performance.now();
+      const durationMs = Math.max(1, durationSec * 1000);
 
-    function step(nowMs) {
-      if (bgmVolumeFadeTokens.get(element) !== token) return;
-      const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
-      const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
-      element.volume = startValue + (clampedTarget - startValue) * easedProgress;
-      if (rawProgress < 1) {
-        requestAnimationFrame(step);
-      } else {
-        element.volume = clampedTarget;
+      function step(nowMs) {
+        if (bgmVolumeFadeTokens.get(element) !== token) return;
+        const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
+        const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+        element.volume = startValue + (clampedTarget - startValue) * easedProgress;
+        if (rawProgress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          element.volume = clampedTarget;
+          resolve();
+        }
       }
-    }
 
-    requestAnimationFrame(step);
-  }
-
-  function setBgmVariant(activeId, durSec = 1.45) {
-    bgmElements.forEach(({ id, element }) => {
-      fadeElementVolume(element, id === activeId ? 1.0 : 0.0, durSec);
+      requestAnimationFrame(step);
     });
   }
 
-  function syncBgmElements(time = psyElement.currentTime) {
+  function isBgmPlaying() {
+    return bgmElements.some(({ element }) => !element.paused && !element.ended);
+  }
+
+  function getActiveBgmElement() {
+    return bgmElements.find(({ id }) => id === activeBgmTrackId)?.element ?? psyElement;
+  }
+
+  function fadeBgmTrack(track, targetValue, durationSec) {
+    const fadeDone = fadeElementVolume(track.element, targetValue, durationSec);
+    if (track.gain) rampParam(track.gain.gain, targetValue, durationSec);
+    return fadeDone;
+  }
+
+  function setBgmVariant(activeId, durSec = 1.45) {
+    if (!bgmElements.some(({ id }) => id === activeId)) return;
+
+    const wasPlaying = isBgmPlaying();
+    const referenceTime = getActiveBgmElement().currentTime;
+    activeBgmTrackId = activeId;
+
+    bgmElements.forEach((track) => {
+      const isActive = track.id === activeId;
+      if (isActive) {
+        if (Number.isFinite(referenceTime)) {
+          track.element.currentTime = Number.isFinite(track.element.duration) && track.element.duration > 0
+            ? Math.min(referenceTime, Math.max(0, track.element.duration - 0.05))
+            : referenceTime;
+        }
+        if (wasPlaying && track.element.paused) track.element.play().catch(console.warn);
+      }
+
+      fadeBgmTrack(track, isActive ? 1.0 : 0.0, durSec).then(() => {
+        if (!isActive && track.id !== activeBgmTrackId) {
+          track.element.volume = 0.0;
+          if (track.gain) track.gain.gain.setValueAtTime(0.0, actx.currentTime);
+          track.element.pause();
+        }
+      });
+    });
+  }
+
+  function syncBgmElements(time = getActiveBgmElement().currentTime) {
     bgmElements.forEach(({ element }) => {
       if (Number.isFinite(element.duration) && element.duration > 0) {
         element.currentTime = Math.min(time, Math.max(0, element.duration - 0.05));
@@ -199,8 +240,14 @@ export function createPsyAudioGraph({
   }
 
   function playBgmElements() {
-    syncBgmElements(psyElement.currentTime);
-    return Promise.allSettled(bgmElements.map(({ element }) => element.play()));
+    const activeElement = getActiveBgmElement();
+    syncBgmElements(activeElement.currentTime);
+    bgmElements.forEach((track) => {
+      const active = track.element === activeElement;
+      track.element.volume = active ? 1.0 : 0.0;
+      if (track.gain) track.gain.gain.setValueAtTime(active ? 1.0 : 0.0, actx.currentTime);
+    });
+    return activeElement.play();
   }
 
   function pauseBgmElements() {
@@ -229,6 +276,8 @@ export function createPsyAudioGraph({
     syncBgmElements,
     playBgmElements,
     pauseBgmElements,
+    getActiveBgmElement,
+    isBgmPlaying,
     ctrLowpassFilter1,
     ctrLowpassFilter2,
     setEchoSend,

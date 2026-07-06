@@ -929,8 +929,9 @@ function buildSoundVariantTexts() {
 updateSoundVariantButtons();
 
 function updateSoundProgressBar() {
-  const duration = Number.isFinite(psyElement.duration) ? psyElement.duration : 0;
-  const progress = duration > 0 ? THREE.MathUtils.clamp(psyElement.currentTime / duration, 0, 1) : 0;
+  const currentBgmElement = getActiveBgmElement?.() ?? psyElement;
+  const duration = Number.isFinite(currentBgmElement.duration) ? currentBgmElement.duration : 0;
+  const progress = duration > 0 ? THREE.MathUtils.clamp(currentBgmElement.currentTime / duration, 0, 1) : 0;
   soundProgressFill.scale.x = Math.max(progress, 0.0001);
   soundProgressFill.position.x = (progress - 1) * soundProgressConfig.width * 0.5;
 }
@@ -1180,7 +1181,7 @@ function closeNewSongView() {
 
 function toggleSongPlayback() {
   if (actx.state !== 'running') actx.resume();
-  if (psyElement.paused) {
+  if (!isBgmPlaying()) {
     playBgmElements().catch(console.warn);
   } else {
     pauseBgmElements();
@@ -1192,7 +1193,7 @@ function selectSoundVariant(variantId) {
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
   updateSoundVariantButtons();
-  if (!psyElement.paused) syncBgmElements(psyElement.currentTime);
+  if (isBgmPlaying()) syncBgmElements(getActiveBgmElement().currentTime);
 }
 
 // --------------------------------------
@@ -1359,10 +1360,13 @@ const {
   audio1Element,
   audio2Element,
   psyElement,
+  bgmElements,
   setBgmVariant,
   syncBgmElements,
   playBgmElements,
   pauseBgmElements,
+  getActiveBgmElement,
+  isBgmPlaying,
   setPsyAudio,
 } = createPsyAudioGraph({
   bgmURL: 'audio/round.mp3',
@@ -1371,20 +1375,16 @@ const {
 });
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
-psyElement.addEventListener('play', () => {
-  setRoundAnimationPlaying(!psyElement.paused && !psyElement.ended);
-});
-psyElement.addEventListener('playing', () => {
-  setRoundAnimationPlaying(!psyElement.paused && !psyElement.ended);
-});
-psyElement.addEventListener('pause', () => {
-  setRoundAnimationPlaying(false);
-});
-psyElement.addEventListener('ended', () => {
-  setRoundAnimationPlaying(false);
-});
-psyElement.addEventListener('error', () => {
-  setRoundAnimationPlaying(false);
+function refreshSoundPlaybackState() {
+  setRoundAnimationPlaying(isBgmPlaying());
+}
+
+[...new Set([psyElement, ...bgmElements.map(({ element }) => element)])].forEach((element) => {
+  element.addEventListener('play', refreshSoundPlaybackState);
+  element.addEventListener('playing', refreshSoundPlaybackState);
+  element.addEventListener('pause', refreshSoundPlaybackState);
+  element.addEventListener('ended', refreshSoundPlaybackState);
+  element.addEventListener('error', refreshSoundPlaybackState);
 });
 
 // --------------------------------------
