@@ -377,26 +377,22 @@ function createMonitorAboutText(width = 22, height = 15) {
 
   ctx2d.textAlign = 'left';
   ctx2d.fillStyle = '#f8fdff';
-  ctx2d.font = '38px sans-serif';
   const lines = [
-    'Anji Teraoka is an artist creating music',
-    'and visual worlds with a psychedelic,',
-    'dreamlike sense of color.',
-    '',
-    'This monitor shows releases, artwork,',
-    'and fragments from the project archive.',
-    '',
-    'Click RELEASES to return to the discography.'
+    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '34px sans-serif' },
+    { text: '', gap: 56 },
+    { text: 'I create music and web pages', font: '38px sans-serif' },
+    { text: 'where music can be played.', font: '38px sans-serif' },
   ];
   const startX = 115;
-  let y = 300;
+  let y = 315;
   lines.forEach((line) => {
-    if (!line) {
-      y += 42;
+    if (!line.text) {
+      y += line.gap ?? 42;
       return;
     }
-    ctx2d.fillText(line, startX, y);
-    y += 58;
+    ctx2d.font = line.font;
+    ctx2d.fillText(line.text, startX, y);
+    y += 62;
   });
 
   const tex = new THREE.CanvasTexture(canvas);
