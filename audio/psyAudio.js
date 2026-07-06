@@ -26,6 +26,7 @@ export function createPsyAudioGraph({
     element.preload = 'auto';
     element.crossOrigin = 'anonymous';
     element.volume = track.id === activeBgmTrackId ? 1.0 : 0.0;
+    element.load();
     return { ...track, element, gain: null };
   });
   const psyElement = bgmElements[0].element;
