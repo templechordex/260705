@@ -124,12 +124,12 @@ export function addObjeToScene(scene) {
     group.add(lamp);
 
     const sideLampL = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), magentaLightMat);
-    sideLampL.position.set(-32, 44.2, z + 12);
+    sideLampL.position.set(-28, 44.2, z + 12);
     ceilingObjects.push(sideLampL);
     group.add(sideLampL);
 
     const sideLampR = sideLampL.clone();
-    sideLampR.position.x = 32;
+    sideLampR.position.x = 28;
     ceilingObjects.push(sideLampR);
     group.add(sideLampR);
   }
