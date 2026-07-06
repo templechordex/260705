@@ -889,24 +889,24 @@ soundProgressGroup.add(soundProgressFill);
 // SOUND source switch (above playback position bar)
 // --------------------------------------
 const soundVariantOptions = [
-  { id: 'original', label: 'Original', url: 'audio/round.mp3' },
-  { id: 'dry', label: 'Dry', url: 'audio/round_dry.mp3' },
-  { id: 'basic', label: 'Basic', url: 'audio/round_roomy.mp3' },
+  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
+  { id: 'round_dry', label: 'Dry', url: 'audio/round_dry.mp3' },
+  { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
-const DEFAULT_SOUND_VARIANT = 'original';
+const DEFAULT_SOUND_VARIANT = 'round';
 const SOUND_VARIANT_CROSSFADE_SEC = 1.45;
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
-    width: 3.35,
-    height: 1.15,
+    width: 5.6,
+    height: 1.7,
     bg: 'rgba(8,18,32,0.42)',
     glow: index === 0 ? '#ff66cc' : '#66ddff',
   });
   button.position.set(
-    signPlaySound.position.x + (index - 1) * 3.7,
+    signPlaySound.position.x + (index - 1) * 6.1,
     signPlaySound.position.y + 8.05,
-    signPlaySound.position.z + 0.2
+    signSongBack.position.z
   );
   button.userData.soundVariantId = option.id;
   scene.add(button);
@@ -917,13 +917,13 @@ function updateSoundVariantButtons() {
   soundVariantButtons.forEach((button) => {
     const active = button.userData.soundVariantId === activeSoundVariant;
     button.material.opacity = active ? 0.86 : 0.54;
-    button.scale.setScalar(active ? 1.06 : 1.0);
+    button.scale.setScalar(1.0);
   });
 }
 function buildSoundVariantTexts() {
   if (!uiFont || soundVariantTexts.length) return;
   soundVariantTexts = soundVariantButtons.map((button, index) => (
-    attachSignText(button, soundVariantOptions[index].label, 0.22, textMatWhite, 0.05)
+    attachSignText(button, soundVariantOptions[index].label, 0.5, textMatWhite, 0.05)
   ));
 }
 updateSoundVariantButtons();
@@ -1456,7 +1456,7 @@ function handleClick(event) {
       handled = true;
 
     } else if (obj === signPlaySound) {
-      // 上部エリアの SOUND ネオンで san.mp3 を再生/停止
+      // 上部エリアの SOUND ネオンで round 系トラックを再生/停止
       toggleSongPlayback();
       handled = true;
 
