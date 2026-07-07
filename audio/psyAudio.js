@@ -235,6 +235,21 @@ export function createPsyAudioGraph({
     return bgmElements.find(({ id }) => id === activeBgmTrackId)?.element ?? psyElement;
   }
 
+  let nextBgmStartTime = null;
+
+  function seekBgmElement(element, time) {
+    const seekTime = Math.max(0, time);
+    try {
+      if (typeof element.fastSeek === 'function') {
+        element.fastSeek(seekTime);
+      } else {
+        element.currentTime = seekTime;
+      }
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
   function fadeBgmTrack(track, targetFrequency, targetGain, durationSec) {
     track.element.volume = 1.0;
     if (track.gain) rampParam(track.gain.gain, targetGain, durationSec);
@@ -265,16 +280,18 @@ export function createPsyAudioGraph({
   function syncBgmElements(time = getActiveBgmElement().currentTime) {
     bgmElements.forEach(({ element }) => {
       if (Number.isFinite(element.duration) && element.duration > 0) {
-        element.currentTime = Math.min(time, Math.max(0, element.duration - 0.05));
+        seekBgmElement(element, Math.min(time, Math.max(0, element.duration - 0.05)));
       } else {
-        element.currentTime = time;
+        seekBgmElement(element, time);
       }
     });
   }
 
   function playBgmElements() {
     const activeElement = getActiveBgmElement();
-    syncBgmElements(activeElement.currentTime);
+    const startTime = nextBgmStartTime ?? activeElement.currentTime;
+    syncBgmElements(startTime);
+    nextBgmStartTime = null;
     const playPromises = bgmElements.map((track) => {
       const active = track.element === activeElement;
       track.element.volume = 1.0;
@@ -288,9 +305,20 @@ export function createPsyAudioGraph({
   }
 
   function pauseBgmElements() {
-    const referenceTime = getActiveBgmElement().currentTime;
-    bgmElements.forEach(({ element }) => element.pause());
-    syncBgmElements(0);
+    nextBgmStartTime = 0;
+    bgmElements.forEach((track) => {
+      track.element.pause();
+      if (track.gain) track.gain.gain.setValueAtTime(0.0, actx.currentTime);
+      if (track.filter) track.filter.frequency.setValueAtTime(MUTED_LOWPASS_FREQ, actx.currentTime);
+      seekBgmElement(track.element, 0);
+
+      if (isIOSAudio) {
+        // iOS Safari can defer a media element seek while paused. Reloading after
+        // the reset discards the old decode position so the next user-triggered
+        // play cannot briefly output audio from the pre-pause timestamp.
+        track.element.load();
+      }
+    });
   }
 
   function setPsyAudio(isOn) {
