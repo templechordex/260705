@@ -1325,7 +1325,7 @@ aboutModal.innerHTML = `
     box-shadow: 0 0 34px rgba(102, 221, 255, 0.38), inset 0 0 22px rgba(255, 102, 204, 0.12);
     color: #f8fdff;
   ">
-    <h2 style="margin: 0 0 8px; font-size: clamp(26px, 4.8vw, 38px); line-height: 1.12; text-align: center;">ANJI TERAOKA</h2>
+    <h2 style="margin: 0 0 8px; font-size: clamp(26px, 4.8vw, 38px); line-height: 1.12; text-align: center;">寺岡アンジ / ANJI TERAOKA</h2>
     <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(16px, 3vw, 22px); font-weight: 700; text-align: center;">ABOUT</p>
     <p style="margin: 0 0 30px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
       音楽と音楽を再生できるWebページの制作をしています。

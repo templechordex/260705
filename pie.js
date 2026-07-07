@@ -74,7 +74,7 @@ function addStationSpotlights() {
   ];
 
   configs.forEach(({ color, position }) => {
-    const spot = new THREE.SpotLight(color, 8.5, 170, THREE.MathUtils.degToRad(22), 0.58, 1.1);
+    const spot = new THREE.SpotLight(color, 85, 170, THREE.MathUtils.degToRad(22), 0.58, 1.1);
     spot.position.set(...position);
     spot.target = stationGroup;
     stationSpotlightGroup.add(spot);
@@ -231,7 +231,7 @@ function createSpaceship() {
 }
 
 const spaceship = createSpaceship();
-spaceship.position.set(-95, 48, -360);
+spaceship.position.set(-70, 32, -120);
 scene.add(spaceship);
 
 function createDistantUfo() {
@@ -278,7 +278,7 @@ function handleClick(event) {
 
   const intersects = _raycaster.intersectObject(signBack, true);
   if (intersects.length) {
-    window.location.assign('./index.html');
+    window.location.assign('./at.html');
   }
 }
 document.addEventListener('click', handleClick);
@@ -307,9 +307,9 @@ function animate() {
   magentaBeacon.intensity = 2.2 + Math.cos(elapsed * 1.8) * 0.7;
 
   spaceship.position.set(
-    -95 + Math.sin(elapsed * 0.09) * 22,
-    48 + Math.sin(elapsed * 0.13) * 9,
-    -360 + Math.cos(elapsed * 0.07) * 34
+    -70 + Math.sin(elapsed * 0.09) * 18,
+    32 + Math.sin(elapsed * 0.13) * 7,
+    -120 + Math.cos(elapsed * 0.07) * 16
   );
   spaceship.rotation.y = Math.PI + Math.sin(elapsed * 0.08) * 0.32;
   spaceship.rotation.z = Math.sin(elapsed * 0.11) * 0.1;
