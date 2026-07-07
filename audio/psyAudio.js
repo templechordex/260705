@@ -20,34 +20,73 @@ export function createPsyAudioGraph({
     : [{ id: 'default', url: bgmURL }];
   const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
   let activeBgmTrackId = initialActiveBgmTrackId;
-  const OPEN_LOWPASS_FREQ = 20000;
-  const MUTED_LOWPASS_FREQ = 10;
+  const OPEN_LOWPASS_FREQ = 22050;
+  const MUTED_LOWPASS_FREQ = 0;
+
+  const roundAudioURL = bgmTrackConfigs.find(({ id }) => id === 'round')?.url ?? bgmURL;
+  const roundDryAudioURL = bgmTrackConfigs.find(({ id }) => id === 'round_dry')?.url ?? 'audio/round_dry.mp3';
+  const roundRoomyAudioURL = bgmTrackConfigs.find(({ id }) => id === 'round_roomy')?.url ?? 'audio/round_roomy.mp3';
+
+  const roundAudioElement = new Audio(roundAudioURL);
+  const roundDryAudioElement = new Audio(roundDryAudioURL);
+  const roundRoomyAudioElement = new Audio(roundRoomyAudioURL);
+  const bgmElementById = new Map([
+    ['round', roundAudioElement],
+    ['round_dry', roundDryAudioElement],
+    ['round_roomy', roundRoomyAudioElement],
+  ]);
+
   const bgmElements = bgmTrackConfigs.map((track) => {
-    const element = new Audio(track.url);
+    const element = bgmElementById.get(track.id) ?? new Audio(track.url);
     element.loop = true;
     element.preload = 'auto';
     element.crossOrigin = 'anonymous';
     element.volume = 1.0;
     element.load();
-    return { ...track, element, gain: null };
+    return { ...track, element, source: null, filter: null, gain: null };
   });
   const psyElement = bgmElements[0].element;
 
   const Track1 = actx.createMediaElementSource(audio1Element);
   const Track2 = actx.createMediaElementSource(audio2Element);
+  const roundSourceNode = actx.createMediaElementSource(roundAudioElement);
+  const roundDrySourceNode = actx.createMediaElementSource(roundDryAudioElement);
+  const roundRoomySourceNode = actx.createMediaElementSource(roundRoomyAudioElement);
+  const bgmSourceById = new Map([
+    ['round', roundSourceNode],
+    ['round_dry', roundDrySourceNode],
+    ['round_roomy', roundRoomySourceNode],
+  ]);
 
   const busTrack1 = actx.createGain();
   Track1.connect(busTrack1);
   Track2.connect(busTrack1);
 
+  const lowpassFilter1 = actx.createBiquadFilter();
+  lowpassFilter1.type = 'lowpass';
+  lowpassFilter1.frequency.value = 22050;
+  const lowpassFilter2 = actx.createBiquadFilter();
+  lowpassFilter2.type = 'lowpass';
+  lowpassFilter2.frequency.value = 0;
+
+  const roundLowpassFilter = actx.createBiquadFilter();
+  roundLowpassFilter.type = 'lowpass';
+  roundLowpassFilter.frequency.value = activeBgmTrackId === 'round' ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+  const bgmFilterById = new Map([
+    ['round', roundLowpassFilter],
+    ['round_dry', lowpassFilter1],
+    ['round_roomy', lowpassFilter2],
+  ]);
+
   bgmElements.forEach((track) => {
-    const source = actx.createMediaElementSource(track.element);
-    const filter = actx.createBiquadFilter();
+    const source = bgmSourceById.get(track.id) ?? actx.createMediaElementSource(track.element);
+    const filter = bgmFilterById.get(track.id) ?? actx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.value = track.id === activeBgmTrackId ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
     filter.Q.value = 0.0001;
     const gain = actx.createGain();
     gain.gain.value = 1.0;
+    track.source = source;
     track.filter = filter;
     track.gain = gain;
     source.connect(filter).connect(gain).connect(busTrack1);
@@ -90,13 +129,6 @@ export function createPsyAudioGraph({
   busTrack1.connect(gainBus1);
   gainBus1.connect(compressor1).connect(actx.destination);
   busTrack1.connect(reverb1).connect(gainReverb1).connect(actx.destination);
-
-  const lowpassFilter1 = actx.createBiquadFilter();
-  lowpassFilter1.type = 'lowpass';
-  lowpassFilter1.frequency.value = 22050;
-  const lowpassFilter2 = actx.createBiquadFilter();
-  lowpassFilter2.type = 'lowpass';
-  lowpassFilter2.frequency.value = 0;
 
   const isIOSAudio = /iP(ad|hone|od)/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -218,12 +250,7 @@ export function createPsyAudioGraph({
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
-    const referenceTime = getActiveBgmElement().currentTime;
     activeBgmTrackId = activeId;
-
-    if (wasPlaying && Number.isFinite(referenceTime)) {
-      syncBgmElements(referenceTime);
-    }
 
     const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {
