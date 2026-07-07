@@ -378,10 +378,10 @@ function createMonitorAboutText(width = 22, height = 15) {
   ctx2d.textAlign = 'left';
   ctx2d.fillStyle = '#f8fdff';
   const lines = [
-    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '34px sans-serif' },
-    { text: '', gap: 56 },
-    { text: 'I create music and web pages', font: '38px sans-serif' },
-    { text: 'where music can be played.', font: '38px sans-serif' },
+    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '42px sans-serif' },
+    { text: '', gap: 64 },
+    { text: 'I create music and web pages', font: '46px sans-serif' },
+    { text: 'where music can be played.', font: '46px sans-serif' },
   ];
   const startX = 115;
   let y = 315;
