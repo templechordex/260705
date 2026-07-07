@@ -377,26 +377,22 @@ function createMonitorAboutText(width = 22, height = 15) {
 
   ctx2d.textAlign = 'left';
   ctx2d.fillStyle = '#f8fdff';
-  ctx2d.font = '38px sans-serif';
   const lines = [
-    'Anji Teraoka is an artist creating music',
-    'and visual worlds with a psychedelic,',
-    'dreamlike sense of color.',
-    '',
-    'This monitor shows releases, artwork,',
-    'and fragments from the project archive.',
-    '',
-    'Click RELEASES to return to the discography.'
+    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '38px sans-serif' },
+    { text: '', gap: 56 },
+    { text: 'I create music and web pages', font: '44px sans-serif' },
+    { text: 'where music can be played.', font: '44px sans-serif' },
   ];
-  const startX = 115;
-  let y = 300;
+  const startX = 80;
+  let y = 315;
   lines.forEach((line) => {
-    if (!line) {
-      y += 42;
+    if (!line.text) {
+      y += line.gap ?? 42;
       return;
     }
-    ctx2d.fillText(line, startX, y);
-    y += 58;
+    ctx2d.font = line.font;
+    ctx2d.fillText(line.text, startX, y);
+    y += 68;
   });
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -889,24 +885,23 @@ soundProgressGroup.add(soundProgressFill);
 // SOUND source switch (above playback position bar)
 // --------------------------------------
 const soundVariantOptions = [
-  { id: 'original', label: 'Original', url: 'audio/round.mp3' },
-  { id: 'dry', label: 'Dry', url: 'audio/round_dry.mp3' },
-  { id: 'basic', label: 'Basic', url: 'audio/round_roomy.mp3' },
+  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
+  { id: 'round_dry', label: 'Dry', url: 'audio/round_dry.mp3' },
+  { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
-const DEFAULT_SOUND_VARIANT = 'original';
-const SOUND_VARIANT_CROSSFADE_SEC = 1.45;
+const DEFAULT_SOUND_VARIANT = 'round';
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
-    width: 3.35,
-    height: 1.15,
+    width: 5.6,
+    height: 1.7,
     bg: 'rgba(8,18,32,0.42)',
     glow: index === 0 ? '#ff66cc' : '#66ddff',
   });
   button.position.set(
-    signPlaySound.position.x + (index - 1) * 3.7,
+    signPlaySound.position.x + (index - 1) * 6.1,
     signPlaySound.position.y + 8.05,
-    signPlaySound.position.z + 0.2
+    signSongBack.position.z
   );
   button.userData.soundVariantId = option.id;
   scene.add(button);
@@ -917,13 +912,13 @@ function updateSoundVariantButtons() {
   soundVariantButtons.forEach((button) => {
     const active = button.userData.soundVariantId === activeSoundVariant;
     button.material.opacity = active ? 0.86 : 0.54;
-    button.scale.setScalar(active ? 1.06 : 1.0);
+    button.scale.setScalar(1.0);
   });
 }
 function buildSoundVariantTexts() {
   if (!uiFont || soundVariantTexts.length) return;
   soundVariantTexts = soundVariantButtons.map((button, index) => (
-    attachSignText(button, soundVariantOptions[index].label, 0.22, textMatWhite, 0.05)
+    attachSignText(button, soundVariantOptions[index].label, 0.5, textMatWhite, 0.05)
   ));
 }
 updateSoundVariantButtons();
@@ -1191,9 +1186,8 @@ function toggleSongPlayback() {
 function selectSoundVariant(variantId) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
+  setBgmVariant(activeSoundVariant);
   updateSoundVariantButtons();
-  if (isBgmPlaying()) syncBgmElements(getActiveBgmElement().currentTime);
 }
 
 // --------------------------------------
@@ -1362,7 +1356,6 @@ const {
   psyElement,
   bgmElements,
   setBgmVariant,
-  syncBgmElements,
   playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
@@ -1373,7 +1366,7 @@ const {
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
 });
-setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
+setBgmVariant(DEFAULT_SOUND_VARIANT);
 
 function refreshSoundPlaybackState() {
   setRoundAnimationPlaying(isBgmPlaying());
@@ -1456,7 +1449,7 @@ function handleClick(event) {
       handled = true;
 
     } else if (obj === signPlaySound) {
-      // 上部エリアの SOUND ネオンで san.mp3 を再生/停止
+      // 上部エリアの SOUND ネオンで round 系トラックを再生/停止
       toggleSongPlayback();
       handled = true;
 
