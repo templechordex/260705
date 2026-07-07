@@ -250,12 +250,7 @@ export function createPsyAudioGraph({
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
-    const referenceTime = getActiveBgmElement().currentTime;
     activeBgmTrackId = activeId;
-
-    if (wasPlaying && Number.isFinite(referenceTime)) {
-      syncBgmElements(referenceTime);
-    }
 
     const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {

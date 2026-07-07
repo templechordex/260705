@@ -1189,7 +1189,6 @@ function selectSoundVariant(variantId) {
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
   updateSoundVariantButtons();
-  if (isBgmPlaying()) syncBgmElements(getActiveBgmElement().currentTime);
 }
 
 // --------------------------------------
@@ -1358,7 +1357,6 @@ const {
   psyElement,
   bgmElements,
   setBgmVariant,
-  syncBgmElements,
   playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
