@@ -85,7 +85,7 @@ export function createPsyAudioGraph({
     filter.frequency.value = track.id === activeBgmTrackId ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
     filter.Q.value = 0.0001;
     const gain = actx.createGain();
-    gain.gain.value = 1.0;
+    gain.gain.value = track.id === activeBgmTrackId ? 1.0 : 0.0;
     track.source = source;
     track.filter = filter;
     track.gain = gain;
@@ -235,35 +235,30 @@ export function createPsyAudioGraph({
     return bgmElements.find(({ id }) => id === activeBgmTrackId)?.element ?? psyElement;
   }
 
-  function fadeBgmTrack(track, targetFrequency, durationSec) {
+  function fadeBgmTrack(track, targetFrequency, targetGain, durationSec) {
     track.element.volume = 1.0;
-    if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
+    if (track.gain) rampParam(track.gain.gain, targetGain, durationSec);
     if (track.filter) {
       rampParam(track.filter.frequency, targetFrequency, durationSec);
       return Promise.resolve();
     }
-    const fallbackVolume = targetFrequency === OPEN_LOWPASS_FREQ ? 1.0 : 0.0;
-    return fadeElementVolume(track.element, fallbackVolume, durationSec);
+    return fadeElementVolume(track.element, targetGain, durationSec);
   }
 
-  function setBgmVariant(activeId, durSec = 1.45) {
+  function setBgmVariant(activeId, durSec = 3.2) {
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
-    const referenceTime = getActiveBgmElement().currentTime;
     activeBgmTrackId = activeId;
-
-    if (wasPlaying && Number.isFinite(referenceTime)) {
-      syncBgmElements(referenceTime);
-    }
 
     const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {
       const isActive = track.id === activeId;
       const targetFrequency = isActive ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+      const targetGain = isActive ? 1.0 : 0.0;
       track.element.volume = 1.0;
       if (wasPlaying && track.element.paused) track.element.play().catch(console.warn);
-      fadeBgmTrack(track, targetFrequency, filterFadeDurationSec);
+      fadeBgmTrack(track, targetFrequency, targetGain, filterFadeDurationSec);
     });
   }
 
@@ -283,7 +278,7 @@ export function createPsyAudioGraph({
     const playPromises = bgmElements.map((track) => {
       const active = track.element === activeElement;
       track.element.volume = 1.0;
-      if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
+      if (track.gain) track.gain.gain.setValueAtTime(active ? 1.0 : 0.0, actx.currentTime);
       if (track.filter) {
         track.filter.frequency.setValueAtTime(active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, actx.currentTime);
       }
