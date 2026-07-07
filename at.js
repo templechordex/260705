@@ -251,9 +251,7 @@ const imgboxLabels = [
   { title: '1stAlbum : PARK MINDS', releaseDate: '2020.10.30' }
 ];
 const imgboxLabelMeshes = imgboxLabels.map(({ title, releaseDate }) => createMonitorLabel(title, releaseDate));
-const aboutTextPlane = createMonitorAboutText();
-aboutTextPlane.visible = false;
-monitorScene.add(...imgboxLabelMeshes, aboutTextPlane);
+monitorScene.add(...imgboxLabelMeshes);
 let currentImgIndex = 0;
 let monitorMode = 'releases';
 
@@ -272,28 +270,14 @@ function showReleasesView(syncButtonText = true) {
   imgboxLabelMeshes.forEach((label, i) => {
     label.visible = (i === currentImgIndex);
   });
-  aboutTextPlane.visible = false;
-  if (syncButtonText) updateAboutButtonText();
 }
 
-function showAboutView() {
-  monitorMode = 'about';
-  imgboxes.forEach((box) => {
-    box.visible = false;
-  });
-  imgboxLabelMeshes.forEach((label) => {
-    label.visible = false;
-  });
-  aboutTextPlane.visible = true;
-  updateAboutButtonText();
+function showAboutPopup() {
+  aboutModal.style.display = 'flex';
 }
 
-function toggleMonitorMode() {
-  if (monitorMode === 'about') {
-    showReleasesView();
-  } else {
-    showAboutView();
-  }
+function hideAboutPopup() {
+  aboutModal.style.display = 'none';
 }
 
 showImgbox(0); // 初期表示はimgbox1
@@ -340,72 +324,6 @@ function createMonitorLabel(title, releaseDate, width = 24, height = 4) {
   const geo = new THREE.PlaneGeometry(width, height);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(0, -7.35, 0.35);
-  mesh.userData._dispose = () => { tex.dispose(); geo.dispose(); mat.dispose(); };
-  return mesh;
-}
-
-
-function createMonitorAboutText(width = 22, height = 15) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1200;
-  canvas.height = 820;
-  const ctx2d = canvas.getContext('2d');
-
-  const gradient = ctx2d.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, 'rgba(2, 10, 20, 0.92)');
-  gradient.addColorStop(0.5, 'rgba(8, 28, 48, 0.96)');
-  gradient.addColorStop(1, 'rgba(2, 10, 20, 0.92)');
-  ctx2d.fillStyle = gradient;
-  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx2d.strokeStyle = '#66ddff';
-  ctx2d.lineWidth = 10;
-  ctx2d.shadowColor = '#66ddff';
-  ctx2d.shadowBlur = 34;
-  ctx2d.strokeRect(28, 28, canvas.width - 56, canvas.height - 56);
-  ctx2d.shadowBlur = 0;
-
-  ctx2d.textAlign = 'center';
-  ctx2d.textBaseline = 'middle';
-  ctx2d.fillStyle = '#f8fdff';
-  ctx2d.font = 'bold 82px sans-serif';
-  ctx2d.fillText('ANJI TERAOKA', canvas.width / 2, 125);
-
-  ctx2d.fillStyle = '#9feeff';
-  ctx2d.font = 'bold 44px sans-serif';
-  ctx2d.fillText('ABOUT', canvas.width / 2, 195);
-
-  ctx2d.textAlign = 'left';
-  ctx2d.fillStyle = '#f8fdff';
-  const lines = [
-    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '34px sans-serif' },
-    { text: '', gap: 56 },
-    { text: 'I create music and web pages', font: '38px sans-serif' },
-    { text: 'where music can be played.', font: '38px sans-serif' },
-  ];
-  const startX = 115;
-  let y = 315;
-  lines.forEach((line) => {
-    if (!line.text) {
-      y += line.gap ?? 42;
-      return;
-    }
-    ctx2d.font = line.font;
-    ctx2d.fillText(line.text, startX, y);
-    y += 62;
-  });
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide
-  });
-  const geo = new THREE.PlaneGeometry(width, height);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(0, 0, 0.4);
   mesh.userData._dispose = () => { tex.dispose(); geo.dispose(); mat.dispose(); };
   return mesh;
 }
@@ -1229,28 +1147,15 @@ function buildBackTopText() {
 }
 
 let signAboutText = null;
-let signReleasesText = null;
 let signPieText = null;
 function buildBottomMenuTexts() {
   if (!uiFont) return;
   if (!signAboutText) {
     signAboutText = attachSignText(signAbout, 'ABOUT', 0.5, textMatWhite, 0.05);
   }
-  if (!signReleasesText) {
-    signReleasesText = attachSignText(signAbout, 'RELEASES', 0.38, textMatWhite, 0.05);
-    signReleasesText.visible = false;
-  }
   if (!signPieText) {
     signPieText = attachSignText(signPie, 'PIE', 0.5, textMatWhite, 0.05);
   }
-  updateAboutButtonText();
-}
-
-function updateAboutButtonText() {
-  if (!signAboutText || !signReleasesText) return;
-  const isAboutView = monitorMode === 'about';
-  signAboutText.visible = !isAboutView;
-  signReleasesText.visible = isAboutView;
 }
 
 // --------------------------------------
@@ -1391,6 +1296,67 @@ function refreshSoundPlaybackState() {
   element.addEventListener('pause', refreshSoundPlaybackState);
   element.addEventListener('ended', refreshSoundPlaybackState);
   element.addEventListener('error', refreshSoundPlaybackState);
+});
+
+// --------------------------------------
+// ABOUT popup
+// --------------------------------------
+const aboutModal = document.createElement('div');
+aboutModal.setAttribute('role', 'dialog');
+aboutModal.setAttribute('aria-modal', 'true');
+aboutModal.setAttribute('aria-label', 'ANJI TERAOKA ABOUT');
+aboutModal.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.58);
+  font-family: sans-serif;
+`;
+aboutModal.innerHTML = `
+  <div style="
+    width: min(88vw, 680px);
+    padding: 34px 34px 30px;
+    border: 1px solid rgba(102, 221, 255, 0.82);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(2, 10, 20, 0.96), rgba(8, 28, 48, 0.96), rgba(2, 10, 20, 0.96));
+    box-shadow: 0 0 34px rgba(102, 221, 255, 0.38), inset 0 0 22px rgba(255, 102, 204, 0.12);
+    color: #f8fdff;
+  ">
+    <h2 style="margin: 0 0 8px; font-size: clamp(36px, 6vw, 54px); line-height: 1.1; text-align: center;">ANJI TERAOKA</h2>
+    <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(22px, 3.8vw, 30px); font-weight: 700; text-align: center;">ABOUT</p>
+    <p style="margin: 0 0 30px; font-size: clamp(24px, 4.8vw, 34px); line-height: 1.7;">
+      音楽と音楽を再生できるWebページの制作をしています。
+    </p>
+    <p style="margin: 0 0 34px; font-size: clamp(24px, 4.8vw, 34px); line-height: 1.55;">
+      I create music and web pages<br>where music can be played.
+    </p>
+    <div style="text-align: center;">
+      <button type="button" data-about-close style="
+        min-width: 136px;
+        padding: 12px 22px;
+        border: 1px solid rgba(102, 221, 255, 0.9);
+        border-radius: 999px;
+        background: rgba(102, 221, 255, 0.16);
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      ">CLOSE</button>
+    </div>
+  </div>
+`;
+document.body.appendChild(aboutModal);
+aboutModal.addEventListener('click', (event) => {
+  if (event.target === aboutModal || event.target.closest('[data-about-close]')) {
+    hideAboutPopup();
+  }
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && aboutModal.style.display !== 'none') {
+    hideAboutPopup();
+  }
 });
 
 // --------------------------------------
@@ -1562,7 +1528,7 @@ function handleClick(event) {
       handled = true;
 
     } else if (obj === signAbout) {
-      toggleMonitorMode();
+      showAboutPopup();
       handled = true;
 
     } else if (obj === signPie) {

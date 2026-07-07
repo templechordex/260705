@@ -15,7 +15,7 @@ import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as a
 // --------------------------------------
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
   exposure: 0.82,
-  cameraPosition: [0, 24, 64],
+  cameraPosition: [0, 20, 20],
   far: 4200,
 });
 const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING DOCK' });
