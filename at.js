@@ -916,13 +916,20 @@ function updateSoundVariantButtons() {
     button.scale.setScalar(1.0);
   });
 }
+function setSoundVariantButtonsVisible(visible) {
+  soundVariantButtons.forEach((button) => {
+    button.visible = visible;
+  });
+}
 function buildSoundVariantTexts() {
   if (!uiFont || soundVariantTexts.length) return;
   soundVariantTexts = soundVariantButtons.map((button, index) => (
     attachSignText(button, soundVariantOptions[index].label, 0.5, textMatWhite, 0.05)
   ));
+  setSoundVariantButtonsVisible(isSoundPlaying);
 }
 updateSoundVariantButtons();
+setSoundVariantButtonsVisible(false);
 
 function updateSoundProgressBar() {
   const currentBgmElement = getActiveBgmElement?.() ?? psyElement;
@@ -1181,13 +1188,14 @@ function toggleSongPlayback() {
     playBgmElements().catch(console.warn);
   } else {
     pauseBgmElements();
+    selectSoundVariant(DEFAULT_SOUND_VARIANT, 0);
   }
 }
 
-function selectSoundVariant(variantId) {
+function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SEC) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
+  setBgmVariant(activeSoundVariant, crossfadeSec);
   updateSoundVariantButtons();
 }
 
@@ -1370,7 +1378,9 @@ const {
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
 function refreshSoundPlaybackState() {
-  setRoundAnimationPlaying(isBgmPlaying());
+  const playing = isBgmPlaying();
+  setRoundAnimationPlaying(playing);
+  setSoundVariantButtonsVisible(playing);
 }
 
 [...new Set([psyElement, ...bgmElements.map(({ element }) => element)])].forEach((element) => {
@@ -1433,7 +1443,7 @@ function handleClick(event) {
   if (intersects1.length) {
     const obj = getClickableRoot(intersects1[0].object);
 
-    if (soundVariantButtons.includes(obj)) {
+    if (isSoundPlaying && soundVariantButtons.includes(obj)) {
       selectSoundVariant(obj.userData.soundVariantId);
       handled = true;
 
