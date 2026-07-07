@@ -20,6 +20,8 @@ export function createPsyAudioGraph({
     : [{ id: 'default', url: bgmURL }];
   const initialActiveBgmTrackId = initialBgmTrackId ?? bgmTrackConfigs[0].id;
   let activeBgmTrackId = initialActiveBgmTrackId;
+  const OPEN_LOWPASS_FREQ = 20000;
+  const MUTED_LOWPASS_FREQ = 10;
   const bgmElements = bgmTrackConfigs.map((track) => {
     const element = new Audio(track.url);
     element.loop = true;
@@ -40,10 +42,15 @@ export function createPsyAudioGraph({
 
   bgmElements.forEach((track) => {
     const source = actx.createMediaElementSource(track.element);
+    const filter = actx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = track.id === activeBgmTrackId ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+    filter.Q.value = 0.0001;
     const gain = actx.createGain();
-    gain.gain.value = track.id === activeBgmTrackId ? 1.0 : 0.0;
+    gain.gain.value = 1.0;
+    track.filter = filter;
     track.gain = gain;
-    source.connect(gain).connect(busTrack1);
+    source.connect(filter).connect(gain).connect(busTrack1);
   });
 
   const reverb1 = actx.createConvolver();
@@ -174,6 +181,11 @@ export function createPsyAudioGraph({
     const referenceTime = getActiveBgmElement().currentTime;
     activeBgmTrackId = activeId;
 
+    if (wasPlaying && Number.isFinite(referenceTime)) {
+      syncBgmElements(referenceTime);
+    }
+
+    const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {
       const isActive = track.id === activeId;
       setTrackAudible(track, isActive);
@@ -207,7 +219,7 @@ export function createPsyAudioGraph({
       setTrackAudible(track, active);
       if (!active) track.element.pause();
     });
-    return activeElement.play();
+    return Promise.allSettled(playPromises);
   }
 
   function pauseBgmElements() {
