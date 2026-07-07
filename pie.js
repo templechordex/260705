@@ -4,8 +4,11 @@
 import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/DRACOLoader.js';
+import { FontLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/FontLoader.js';
+import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geometries/TextGeometry.js';
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createLoadingManager } from './core/loadingScreen.js';
+import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 
 // --------------------------------------
 // Core: Scene / Camera / Renderer
@@ -24,6 +27,24 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://unpkg.com/three@0.180.0/examples/jsm/libs/draco/gltf/');
 const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
+const fontLoader = new FontLoader(loadingManager);
+const textMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
+let uiFont = null;
+let signBackText = null;
+
+function attachSignText(signMesh, text, size, material = textMatWhite, zOffset = 0.05) {
+  return attachSharedSignText(THREE, TextGeometry, signMesh, uiFont, text, size, material, zOffset);
+}
+
+function buildBackText() {
+  if (!uiFont || signBackText) return;
+  signBackText = attachSignText(signBack, 'BACK', 0.5);
+}
+
+fontLoader.load('fonts/dela.json', (font) => {
+  uiFont = font;
+  buildBackText();
+}, undefined, (e) => console.error(e));
 // --------------------------------------
 // Lighting
 // --------------------------------------
@@ -40,6 +61,26 @@ scene.add(stationGlow);
 const magentaBeacon = new THREE.PointLight(0xff66cc, 2.8, 280);
 magentaBeacon.position.set(-32, 24, -24);
 scene.add(magentaBeacon);
+
+const stationSpotlightGroup = new THREE.Group();
+scene.add(stationSpotlightGroup);
+
+function addStationSpotlights() {
+  const configs = [
+    { color: 0x66ddff, position: [54, 20, -18] },
+    { color: 0xff66cc, position: [-54, 20, -18] },
+    { color: 0x88f7ff, position: [0, 62, -18] },
+    { color: 0xffb6e6, position: [0, -30, -18] },
+  ];
+
+  configs.forEach(({ color, position }) => {
+    const spot = new THREE.SpotLight(color, 85, 170, THREE.MathUtils.degToRad(22), 0.58, 1.1);
+    spot.position.set(...position);
+    spot.target = stationGroup;
+    stationSpotlightGroup.add(spot);
+  });
+}
+
 
 // --------------------------------------
 // Star field / PIE nebula
@@ -89,6 +130,7 @@ scene.add(pieNebula);
 // --------------------------------------
 const stationGroup = new THREE.Group();
 scene.add(stationGroup);
+addStationSpotlights();
 
 function createDockingStation() {
   const group = new THREE.Group();
@@ -189,6 +231,7 @@ function createSpaceship() {
 }
 
 const spaceship = createSpaceship();
+spaceship.position.set(-70, 32, -120);
 scene.add(spaceship);
 
 function createDistantUfo() {
@@ -215,6 +258,33 @@ const distantUfo = createDistantUfo();
 scene.add(distantUfo);
 
 // --------------------------------------
+// Bottom BACK button (aligned with at BACK TO TOP)
+// --------------------------------------
+const signBack = createSharedSignBoardPlane(THREE, {
+  width: 8, height: 2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+});
+signBack.position.set(0, 0, -10);
+scene.add(signBack);
+
+const _v2 = new THREE.Vector2();
+const _raycaster = new THREE.Raycaster();
+
+function handleClick(event) {
+  _v2.set(
+    (event.clientX / window.innerWidth) * 2 - 1,
+    -(event.clientY / window.innerHeight) * 2 + 1
+  );
+  _raycaster.setFromCamera(_v2, camera);
+
+  const intersects = _raycaster.intersectObject(signBack, true);
+  if (intersects.length) {
+    window.location.assign('./at.html');
+  }
+}
+document.addEventListener('click', handleClick);
+
+
+// --------------------------------------
 // Resize / Animate
 // --------------------------------------
 function onWindowResize() {
@@ -236,14 +306,13 @@ function animate() {
   stationGlow.intensity = 3.2 + Math.sin(elapsed * 1.4) * 0.9;
   magentaBeacon.intensity = 2.2 + Math.cos(elapsed * 1.8) * 0.7;
 
-  const dockProgress = (Math.sin(elapsed * 0.42) + 1) * 0.5;
   spaceship.position.set(
-    Math.cos(elapsed * 0.42) * 28,
-    8 + Math.sin(elapsed * 0.72) * 3,
-    42 - dockProgress * 52
+    -70 + Math.sin(elapsed * 0.09) * 18,
+    32 + Math.sin(elapsed * 0.13) * 7,
+    -120 + Math.cos(elapsed * 0.07) * 16
   );
-  spaceship.rotation.y = -elapsed * 0.42 + Math.PI;
-  spaceship.rotation.z = Math.sin(elapsed * 0.8) * 0.16;
+  spaceship.rotation.y = Math.PI + Math.sin(elapsed * 0.08) * 0.32;
+  spaceship.rotation.z = Math.sin(elapsed * 0.11) * 0.1;
 
   distantUfo.position.x = -135 + Math.sin(elapsed * 0.18) * 18;
   distantUfo.position.y = 76 + Math.sin(elapsed * 0.31) * 7;
@@ -253,6 +322,7 @@ function animate() {
   camera.position.x = Math.sin(elapsed * 0.12) * 5;
   camera.position.y = 24 + Math.sin(elapsed * 0.1) * 2;
   camera.lookAt(0, 8, -16);
+  signBack.quaternion.copy(camera.quaternion);
 
   renderer.render(scene, camera);
 }
@@ -264,6 +334,7 @@ window.addEventListener('beforeunload', () => {
     if (Array.isArray(obj.material)) obj.material.forEach((mat) => mat.dispose?.());
     else obj.material?.dispose?.();
   });
+  document.removeEventListener('click', handleClick);
   dracoLoader.dispose();
   renderer.dispose();
 });
