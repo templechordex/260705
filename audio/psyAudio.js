@@ -290,9 +290,7 @@ export function createPsyAudioGraph({
   function pauseBgmElements() {
     const referenceTime = getActiveBgmElement().currentTime;
     bgmElements.forEach(({ element }) => element.pause());
-    if (Number.isFinite(referenceTime)) {
-      syncBgmElements(referenceTime);
-    }
+    syncBgmElements(0);
   }
 
   function setPsyAudio(isOn) {
