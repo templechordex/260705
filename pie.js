@@ -2,13 +2,10 @@
 //pie - STARSHIP PIE docking station
 
 import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
-import { FontLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/FontLoader.js';
-import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geometries/TextGeometry.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/DRACOLoader.js';
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createLoadingManager } from './core/loadingScreen.js';
-import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
 
 // --------------------------------------
 // Core: Scene / Camera / Renderer
@@ -27,25 +24,6 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://unpkg.com/three@0.180.0/examples/jsm/libs/draco/gltf/');
 const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-
-// --------------------------------------
-// Font + sign helpers (same pattern as at.js)
-// --------------------------------------
-const fontLoader = new FontLoader(loadingManager);
-let uiFont = null;
-const textMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const textMatCyan = new THREE.MeshBasicMaterial({ color: 0x9ff4ff });
-
-function createSignBoardPlane(options = {}) {
-  return createSharedSignBoardPlane(THREE, options);
-}
-
-function attachSignText(signMesh, text, size, material = textMatWhite, zOffset = 2) {
-  return attachSharedSignText(THREE, TextGeometry, signMesh, uiFont, text, size, material, zOffset);
-}
-
 // --------------------------------------
 // Lighting
 // --------------------------------------
@@ -235,49 +213,6 @@ function createDistantUfo() {
 
 const distantUfo = createDistantUfo();
 scene.add(distantUfo);
-
-// --------------------------------------
-// UI: title + navigation
-// --------------------------------------
-const titleSign = createSignBoardPlane({ width: 19, height: 3, bg: 'rgba(8,18,32,0.55)', glow: '#ff66cc' });
-titleSign.position.set(0, 37, -18);
-scene.add(titleSign);
-
-const dockSign = createSignBoardPlane({ width: 15, height: 2.1, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff' });
-dockSign.position.set(0, -14, -10);
-scene.add(dockSign);
-
-const backSign = createSignBoardPlane({ width: 8, height: 2, bg: 'rgba(5,10,18,0.58)', glow: '#66ddff' });
-backSign.position.set(0, -21, 3);
-scene.add(backSign);
-
-let titleText = null;
-let dockText = null;
-let backText = null;
-function buildTexts() {
-  if (!uiFont) return;
-  if (!titleText) titleText = attachSignText(titleSign, 'STARSHIP PIE', 0.62, textMatWhite, 0.05);
-  if (!dockText) dockText = attachSignText(dockSign, 'DOCKING STATION READY', 0.36, textMatCyan, 0.05);
-  if (!backText) backText = attachSignText(backSign, 'BACK TO AT', 0.45, textMatWhite, 0.05);
-}
-
-fontLoader.load('fonts/dela.json', (font) => {
-  uiFont = font;
-  buildTexts();
-}, undefined, (e) => console.error(e));
-buildTexts();
-
-// --------------------------------------
-// Interaction
-// --------------------------------------
-const clickable = [backSign];
-function handleClick(event) {
-  pointer.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObjects(clickable, true)[0];
-  if (hit) window.location.assign('./at.html');
-}
-document.addEventListener('click', handleClick);
 
 // --------------------------------------
 // Resize / Animate

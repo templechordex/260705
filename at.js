@@ -1327,10 +1327,10 @@ aboutModal.innerHTML = `
   ">
     <h2 style="margin: 0 0 8px; font-size: clamp(36px, 6vw, 54px); line-height: 1.1; text-align: center;">ANJI TERAOKA</h2>
     <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(22px, 3.8vw, 30px); font-weight: 700; text-align: center;">ABOUT</p>
-    <p style="margin: 0 0 30px; font-size: clamp(24px, 4.8vw, 34px); line-height: 1.7;">
+    <p style="margin: 0 0 30px; font-size: clamp(18px, 3.3vw, 24px); line-height: 1.65;">
       音楽と音楽を再生できるWebページの制作をしています。
     </p>
-    <p style="margin: 0 0 34px; font-size: clamp(24px, 4.8vw, 34px); line-height: 1.55;">
+    <p style="margin: 0 0 34px; font-size: clamp(18px, 3.3vw, 24px); line-height: 1.5;">
       I create music and web pages<br>where music can be played.
     </p>
     <div style="text-align: center;">
