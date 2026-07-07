@@ -916,13 +916,20 @@ function updateSoundVariantButtons() {
     button.scale.setScalar(1.0);
   });
 }
+function setSoundVariantButtonsVisible(visible) {
+  soundVariantButtons.forEach((button) => {
+    button.visible = visible;
+  });
+}
 function buildSoundVariantTexts() {
   if (!uiFont || soundVariantTexts.length) return;
   soundVariantTexts = soundVariantButtons.map((button, index) => (
     attachSignText(button, soundVariantOptions[index].label, 0.5, textMatWhite, 0.05)
   ));
+  setSoundVariantButtonsVisible(isSoundPlaying);
 }
 updateSoundVariantButtons();
+setSoundVariantButtonsVisible(false);
 
 function updateSoundProgressBar() {
   const currentBgmElement = getActiveBgmElement?.() ?? psyElement;
@@ -1181,13 +1188,16 @@ function toggleSongPlayback() {
     playBgmElements().catch(console.warn);
   } else {
     pauseBgmElements();
+    selectSoundVariant(DEFAULT_SOUND_VARIANT, 0);
+    setRoundAnimationPlaying(false);
+    setSoundVariantButtonsVisible(false);
   }
 }
 
-function selectSoundVariant(variantId) {
+function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SEC) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
+  setBgmVariant(activeSoundVariant, crossfadeSec);
   updateSoundVariantButtons();
 }
 
@@ -1370,7 +1380,9 @@ const {
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
 function refreshSoundPlaybackState() {
-  setRoundAnimationPlaying(isBgmPlaying());
+  const playing = isBgmPlaying();
+  setRoundAnimationPlaying(playing);
+  setSoundVariantButtonsVisible(playing);
 }
 
 [...new Set([psyElement, ...bgmElements.map(({ element }) => element)])].forEach((element) => {
@@ -1379,6 +1391,97 @@ function refreshSoundPlaybackState() {
   element.addEventListener('pause', refreshSoundPlaybackState);
   element.addEventListener('ended', refreshSoundPlaybackState);
   element.addEventListener('error', refreshSoundPlaybackState);
+});
+
+// --------------------------------------
+// Navigation confirmation shown while music is playing
+// --------------------------------------
+const soundNavigationModal = document.createElement('div');
+soundNavigationModal.setAttribute('role', 'dialog');
+soundNavigationModal.setAttribute('aria-modal', 'true');
+soundNavigationModal.setAttribute('aria-label', '音楽停止の確認');
+soundNavigationModal.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  font-family: sans-serif;
+`;
+soundNavigationModal.innerHTML = `
+  <div style="
+    width: min(86vw, 420px);
+    padding: 24px 22px 20px;
+    border: 1px solid rgba(102, 221, 255, 0.78);
+    border-radius: 18px;
+    background: rgba(8, 18, 32, 0.94);
+    box-shadow: 0 0 24px rgba(102, 221, 255, 0.35), inset 0 0 18px rgba(255, 102, 204, 0.12);
+    color: #fff;
+    text-align: center;
+  ">
+    <p style="margin: 0 0 18px; font-size: 17px; line-height: 1.65;">
+      音楽を止めて移動しますか？
+    </p>
+    <div style="display: flex; gap: 14px; justify-content: center;">
+      <button type="button" data-nav-answer="yes" style="
+        min-width: 112px;
+        padding: 10px 18px;
+        border: 1px solid rgba(255, 102, 204, 0.9);
+        border-radius: 999px;
+        background: rgba(255, 102, 204, 0.22);
+        color: #fff;
+        cursor: pointer;
+      ">はい</button>
+      <button type="button" data-nav-answer="no" style="
+        min-width: 112px;
+        padding: 10px 18px;
+        border: 1px solid rgba(102, 221, 255, 0.9);
+        border-radius: 999px;
+        background: rgba(102, 221, 255, 0.16);
+        color: #fff;
+        cursor: pointer;
+      ">いいえ</button>
+    </div>
+  </div>
+`;
+document.body.appendChild(soundNavigationModal);
+
+let pendingSoundNavigation = null;
+
+function hideSoundNavigationModal() {
+  pendingSoundNavigation = null;
+  soundNavigationModal.style.display = 'none';
+}
+
+function stopSoundPlaybackForNavigation() {
+  if (!isBgmPlaying()) return;
+  pauseBgmElements();
+  selectSoundVariant(DEFAULT_SOUND_VARIANT, 0);
+  setRoundAnimationPlaying(false);
+  setSoundVariantButtonsVisible(false);
+}
+
+function requestNavigationAfterSoundStop(onConfirm) {
+  if (!isBgmPlaying()) {
+    onConfirm();
+    return;
+  }
+  pendingSoundNavigation = onConfirm;
+  soundNavigationModal.style.display = 'flex';
+}
+
+soundNavigationModal.addEventListener('click', (event) => {
+  const answer = event.target?.dataset?.navAnswer;
+  if (answer === 'yes') {
+    const navigate = pendingSoundNavigation;
+    hideSoundNavigationModal();
+    stopSoundPlaybackForNavigation();
+    navigate?.();
+  } else if (answer === 'no' || event.target === soundNavigationModal) {
+    hideSoundNavigationModal();
+  }
 });
 
 // --------------------------------------
@@ -1433,7 +1536,7 @@ function handleClick(event) {
   if (intersects1.length) {
     const obj = getClickableRoot(intersects1[0].object);
 
-    if (soundVariantButtons.includes(obj)) {
+    if (isSoundPlaying && soundVariantButtons.includes(obj)) {
       selectSoundVariant(obj.userData.soundVariantId);
       handled = true;
 
@@ -1463,11 +1566,11 @@ function handleClick(event) {
       handled = true;
 
     } else if (obj === signPie) {
-      triggerPieAnimation();
+      requestNavigationAfterSoundStop(triggerPieAnimation);
       handled = true;
 
     } else if (obj === signBackTop) {
-      window.location.assign('./index.html');
+      requestNavigationAfterSoundStop(() => window.location.assign('./index.html'));
       handled = true;
     }
   }
