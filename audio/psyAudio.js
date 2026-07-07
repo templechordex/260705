@@ -161,40 +161,6 @@ export function createPsyAudioGraph({
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
 
-  const bgmVolumeFadeTokens = new WeakMap();
-
-  function fadeElementVolume(element, targetValue, durationSec) {
-    const clampedTarget = Math.min(1, Math.max(0, targetValue));
-    if (durationSec <= 0) {
-      bgmVolumeFadeTokens.delete(element);
-      element.volume = clampedTarget;
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      const token = Symbol('bgmVolumeFade');
-      bgmVolumeFadeTokens.set(element, token);
-      const startValue = element.volume;
-      const startMs = performance.now();
-      const durationMs = Math.max(1, durationSec * 1000);
-
-      function step(nowMs) {
-        if (bgmVolumeFadeTokens.get(element) !== token) return;
-        const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
-        const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
-        element.volume = startValue + (clampedTarget - startValue) * easedProgress;
-        if (rawProgress < 1) {
-          requestAnimationFrame(step);
-        } else {
-          element.volume = clampedTarget;
-          resolve();
-        }
-      }
-
-      requestAnimationFrame(step);
-    });
-  }
-
   function isBgmPlaying() {
     return bgmElements.some(({ element }) => !element.paused && !element.ended);
   }
@@ -203,18 +169,12 @@ export function createPsyAudioGraph({
     return bgmElements.find(({ id }) => id === activeBgmTrackId)?.element ?? psyElement;
   }
 
-  function fadeBgmTrack(track, targetFrequency, durationSec) {
+  function setTrackAudible(track, audible) {
     track.element.volume = 1.0;
-    if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
-    if (track.filter) {
-      rampParam(track.filter.frequency, targetFrequency, durationSec);
-      return Promise.resolve();
-    }
-    const fallbackVolume = targetFrequency === OPEN_LOWPASS_FREQ ? 1.0 : 0.0;
-    return fadeElementVolume(track.element, fallbackVolume, durationSec);
+    if (track.gain) track.gain.gain.setValueAtTime(audible ? 1.0 : 0.0, actx.currentTime);
   }
 
-  function setBgmVariant(activeId, durSec = 1.45) {
+  function setBgmVariant(activeId) {
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
@@ -228,10 +188,17 @@ export function createPsyAudioGraph({
     const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {
       const isActive = track.id === activeId;
-      const targetFrequency = isActive ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
-      track.element.volume = 1.0;
-      if (wasPlaying && track.element.paused) track.element.play().catch(console.warn);
-      fadeBgmTrack(track, targetFrequency, filterFadeDurationSec);
+      setTrackAudible(track, isActive);
+      if (isActive) {
+        if (Number.isFinite(referenceTime)) {
+          track.element.currentTime = Number.isFinite(track.element.duration) && track.element.duration > 0
+            ? Math.min(referenceTime, Math.max(0, track.element.duration - 0.05))
+            : referenceTime;
+        }
+        if (wasPlaying) track.element.play().catch(console.warn);
+      } else {
+        track.element.pause();
+      }
     });
   }
 
@@ -247,15 +214,10 @@ export function createPsyAudioGraph({
 
   function playBgmElements() {
     const activeElement = getActiveBgmElement();
-    syncBgmElements(activeElement.currentTime);
-    const playPromises = bgmElements.map((track) => {
+    bgmElements.forEach((track) => {
       const active = track.element === activeElement;
-      track.element.volume = 1.0;
-      if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
-      if (track.filter) {
-        track.filter.frequency.setValueAtTime(active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, actx.currentTime);
-      }
-      return track.element.play();
+      setTrackAudible(track, active);
+      if (!active) track.element.pause();
     });
     return Promise.allSettled(playPromises);
   }

@@ -378,12 +378,12 @@ function createMonitorAboutText(width = 22, height = 15) {
   ctx2d.textAlign = 'left';
   ctx2d.fillStyle = '#f8fdff';
   const lines = [
-    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '34px sans-serif' },
+    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '38px sans-serif' },
     { text: '', gap: 56 },
-    { text: 'I create music and web pages', font: '38px sans-serif' },
-    { text: 'where music can be played.', font: '38px sans-serif' },
+    { text: 'I create music and web pages', font: '44px sans-serif' },
+    { text: 'where music can be played.', font: '44px sans-serif' },
   ];
-  const startX = 115;
+  const startX = 80;
   let y = 315;
   lines.forEach((line) => {
     if (!line.text) {
@@ -392,7 +392,7 @@ function createMonitorAboutText(width = 22, height = 15) {
     }
     ctx2d.font = line.font;
     ctx2d.fillText(line.text, startX, y);
-    y += 62;
+    y += 68;
   });
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -890,7 +890,6 @@ const soundVariantOptions = [
   { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
-const SOUND_VARIANT_CROSSFADE_SEC = 1.45;
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
@@ -1187,9 +1186,8 @@ function toggleSongPlayback() {
 function selectSoundVariant(variantId) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  setBgmVariant(activeSoundVariant, SOUND_VARIANT_CROSSFADE_SEC);
+  setBgmVariant(activeSoundVariant);
   updateSoundVariantButtons();
-  if (isBgmPlaying()) syncBgmElements(getActiveBgmElement().currentTime);
 }
 
 // --------------------------------------
@@ -1358,7 +1356,6 @@ const {
   psyElement,
   bgmElements,
   setBgmVariant,
-  syncBgmElements,
   playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
@@ -1369,7 +1366,7 @@ const {
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
 });
-setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
+setBgmVariant(DEFAULT_SOUND_VARIANT);
 
 function refreshSoundPlaybackState() {
   setRoundAnimationPlaying(isBgmPlaying());
