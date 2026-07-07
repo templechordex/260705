@@ -101,6 +101,7 @@ export function createPsyAudioGraph({
   const isIOSAudio = /iP(ad|hone|od)/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const manualRampTokens = new WeakMap();
+  const filterRampTokens = new WeakMap();
 
   function cancelParamAutomation(param, time) {
     if (typeof param.cancelAndHoldAtTime === 'function') {
@@ -157,6 +158,42 @@ export function createPsyAudioGraph({
     param.linearRampToValueAtTime(targetValue, t0 + Math.max(0.001, durationSec));
   }
 
+  function rampLowpassFrequency(filter, targetFrequency, durationSec) {
+    const param = filter.frequency;
+    const now = actx.currentTime;
+    const safeTarget = Math.max(1, targetFrequency);
+    filterRampTokens.delete(filter);
+    if (durationSec <= 0) {
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(safeTarget, now);
+      return;
+    }
+
+    const token = Symbol('filterRamp');
+    filterRampTokens.set(filter, token);
+    param.cancelScheduledValues(now);
+    const startFrequency = Math.max(1, param.value || safeTarget);
+    const startLog = Math.log(startFrequency);
+    const targetLog = Math.log(safeTarget);
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (filterRampTokens.get(filter) !== token) return;
+      const progress = Math.min((nowMs - startMs) / durationMs, 1);
+      const easedProgress = progress * progress * (3 - 2 * progress);
+      const frequency = Math.exp(startLog + (targetLog - startLog) * easedProgress);
+      param.setValueAtTime(frequency, actx.currentTime);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        param.setValueAtTime(safeTarget, actx.currentTime);
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
   const ctrLowpassFilter1 = (freq, dur) => rampParam(lowpassFilter1.frequency, freq, dur);
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
@@ -207,7 +244,7 @@ export function createPsyAudioGraph({
     track.element.volume = 1.0;
     if (track.gain) track.gain.gain.setValueAtTime(1.0, actx.currentTime);
     if (track.filter) {
-      rampParam(track.filter.frequency, targetFrequency, durationSec);
+      rampLowpassFrequency(track.filter, targetFrequency, durationSec);
       return Promise.resolve();
     }
     const fallbackVolume = targetFrequency === OPEN_LOWPASS_FREQ ? 1.0 : 0.0;

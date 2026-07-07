@@ -378,12 +378,12 @@ function createMonitorAboutText(width = 22, height = 15) {
   ctx2d.textAlign = 'left';
   ctx2d.fillStyle = '#f8fdff';
   const lines = [
-    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '34px sans-serif' },
+    { text: '音楽と音楽を再生できるWebページの制作をしています。', font: '38px sans-serif' },
     { text: '', gap: 56 },
-    { text: 'I create music and web pages', font: '38px sans-serif' },
-    { text: 'where music can be played.', font: '38px sans-serif' },
+    { text: 'I create music and web pages', font: '44px sans-serif' },
+    { text: 'where music can be played.', font: '44px sans-serif' },
   ];
-  const startX = 115;
+  const startX = 80;
   let y = 315;
   lines.forEach((line) => {
     if (!line.text) {
@@ -392,7 +392,7 @@ function createMonitorAboutText(width = 22, height = 15) {
     }
     ctx2d.font = line.font;
     ctx2d.fillText(line.text, startX, y);
-    y += 62;
+    y += 68;
   });
 
   const tex = new THREE.CanvasTexture(canvas);
