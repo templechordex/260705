@@ -576,6 +576,9 @@ const {
 // --------------------------------------
 // Camera tween
 // --------------------------------------
+// at.js の画面切替と同じテンポで、np.js のカメラ移動も軽快にする。
+const CAMERA_TWEEN_DURATION_MS = 1600;
+
 function animateCameraToPositionAndTarget(cam, targetPos, targetLookAt, durationMs, onDone) {
   tweenCamera(cam, targetPos, targetLookAt, durationMs, onDone, {
     THREE,
@@ -622,17 +625,17 @@ function handleClick(event) {
     if (!obj) return;
 
     if (obj === menuPlane) {
-      animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, -20, 20), new THREE.Vector3(0, -20, -1000), 3000);
+      animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, -20, 20), new THREE.Vector3(0, -20, -1000), CAMERA_TWEEN_DURATION_MS);
       handled = true;
 
     } else if (obj === windowGlass1) {
      changeSky();
-      animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, 20, 20), new THREE.Vector3(0, 0, -1000), 3000);
+      animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, 20, 20), new THREE.Vector3(0, 0, -1000), CAMERA_TWEEN_DURATION_MS);
       handled = true;
 
     } else if (obj === bubble1) {
       // MUSICのバブル
-      animateCameraToPositionAndTarget(camera, new THREE.Vector3(-100, -20, 20), new THREE.Vector3(-100, -20, -1000), 3000);
+      animateCameraToPositionAndTarget(camera, new THREE.Vector3(-100, -20, 20), new THREE.Vector3(-100, -20, -1000), CAMERA_TWEEN_DURATION_MS);
       handled = true;
 
     } else if (obj === mBubble2) {
@@ -647,14 +650,14 @@ function handleClick(event) {
 
     } else if (obj === signReturn) {
       // ルーム内から地上（y&#8776;0）へ戻る
-     animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, 20, 20), new THREE.Vector3(0, 0, -1000), 3000);
+     animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, 20, 20), new THREE.Vector3(0, 0, -1000), CAMERA_TWEEN_DURATION_MS);
       handled = true;
 
     } else if (obj === flagMesh) {
       // フラッグに近づく → レインボー全面 → 遷移
       const toPos    = new THREE.Vector3(100, 500, -940);
       const toLookAt = new THREE.Vector3(100, 500, -1000);
-      animateCameraToPositionAndTarget(camera, toPos, toLookAt, 3000, () => {
+      animateCameraToPositionAndTarget(camera, toPos, toLookAt, CAMERA_TWEEN_DURATION_MS, () => {
         rainbowOn = true;
         rainbowPass.enabled = true;
         rainbowStartTime = performance.now();
@@ -678,7 +681,7 @@ function handleClick(event) {
       // フラッグに近づく → レインボー全面 → 遷移
       const toPos    = new THREE.Vector3(100, 500, -940);
       const toLookAt = new THREE.Vector3(100, 500, -1000);
-      animateCameraToPositionAndTarget(camera, toPos, toLookAt, 3000, () => {
+      animateCameraToPositionAndTarget(camera, toPos, toLookAt, CAMERA_TWEEN_DURATION_MS, () => {
         rainbowOn = true;
         rainbowPass.enabled = true;
         rainbowStartTime = performance.now();
