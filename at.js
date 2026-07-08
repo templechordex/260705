@@ -1452,8 +1452,11 @@ aboutModal.innerHTML = `
   ">
     <h2 style="margin: 0 0 8px; font-size: clamp(16px, 3vw, 22px); line-height: 1.12; text-align: center;">寺岡アンジ / ANJI TERAOKA</h2>
     <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(16px, 3vw, 22px); font-weight: 700; text-align: center;">ABOUT</p>
-    <p style="margin: 0 0 34px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
-      サイケデリックポップなどの宅録音楽を作っています。最近は、音楽と連動する3D Webの制作も行なっています。Ish Nurasとしても活動しています。
+    <p style="margin: 0 0 18px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
+      宅録で音楽を制作しています。最近は、音楽と連動する3D Web作品も制作しています。音楽ユニット「Ish Nuras」でも活動しています。
+    </p>
+    <p lang="en" style="margin: 0 0 34px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65; color: #d9f8ff;">
+      I create music through home recording. Recently, I have also been creating 3D web works that sync with music. I am also active in the music unit “Ish Nuras.”
     </p>
     <div style="text-align: center;">
       <button type="button" data-about-close style="
