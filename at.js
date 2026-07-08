@@ -892,6 +892,20 @@ let roundCore;
 let roundCoreShell;
 let roundMist;
 let roundGlowLight;
+let roundBasicShapesGroup;
+const ROUND_DRY_GRAY = 0x9a9a9a;
+
+function rememberRoundMaterialColor(material) {
+  if (material?.color && material.userData.originalColor === undefined) {
+    material.userData.originalColor = material.color.getHex();
+  }
+}
+
+function setRoundMaterialDry(material, dry) {
+  if (!material?.color) return;
+  rememberRoundMaterialColor(material);
+  material.color.setHex(dry ? ROUND_DRY_GRAY : material.userData.originalColor);
+}
 
 function createRoundVisual() {
   const coreMat = new THREE.MeshBasicMaterial({
@@ -923,6 +937,7 @@ function createRoundVisual() {
   roundGroup.add(roundMist);
 
   roundGlowLight = new THREE.PointLight(0xcfc4ff, ROUND_CONFIG.centerGlowIntensity, 9);
+  roundGlowLight.userData.originalColor = roundGlowLight.color.getHex();
   roundGlowLight.position.set(0, 0, 1.4);
   roundGroup.add(roundGlowLight);
 
@@ -985,6 +1000,55 @@ function createRoundVisual() {
     roundFragments.push(frag);
     roundGroup.add(frag);
   }
+
+  roundBasicShapesGroup = new THREE.Group();
+  roundBasicShapesGroup.visible = false;
+  const basicShapeMat = new THREE.MeshBasicMaterial({
+    color: 0xf0f2f4,
+    transparent: true,
+    opacity: 0.74,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const basicShapes = [
+    { geo: new THREE.CircleGeometry(0.42, 48), x: -1.1 },
+    { geo: new THREE.CircleGeometry(0.48, 3), x: 0 },
+    { geo: new THREE.PlaneGeometry(0.82, 0.82), x: 1.1 },
+  ];
+  basicShapes.forEach(({ geo, x }, index) => {
+    const shape = new THREE.Mesh(geo, basicShapeMat.clone());
+    shape.position.set(x, 0, 0.18);
+    shape.userData.phase = index * 2.1;
+    roundBasicShapesGroup.add(shape);
+  });
+  roundGroup.add(roundBasicShapesGroup);
+}
+
+function updateRoundVisualMode() {
+  const dry = activeSoundVariant === 'round_dry';
+  const basic = activeSoundVariant === 'round_roomy';
+
+  roundGroup.traverse((obj) => {
+    if (obj.isMesh) {
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach((mat) => setRoundMaterialDry(mat, dry));
+      } else {
+        setRoundMaterialDry(obj.material, dry);
+      }
+    }
+  });
+
+  if (roundGlowLight) {
+    roundGlowLight.color.setHex(dry ? ROUND_DRY_GRAY : roundGlowLight.userData.originalColor);
+  }
+
+  roundBasicShapesGroup.visible = basic;
+  roundCore.visible = !basic;
+  roundCoreShell.visible = !basic;
+  roundMist.visible = !basic;
+  roundRings.forEach((ring) => { ring.visible = !basic; });
+  roundParticles.forEach((p) => { p.visible = !basic; });
+  roundFragments.forEach((frag) => { frag.visible = !basic; });
 }
 
 function updateRoundAnimation(elapsedTime, deltaTime) {
@@ -1022,6 +1086,14 @@ function updateRoundAnimation(elapsedTime, deltaTime) {
       Math.sin(orbit) * radius * 0.38
     );
   });
+
+  if (roundBasicShapesGroup?.visible) {
+    roundBasicShapesGroup.children.forEach((shape, index) => {
+      const pulse = Math.sin(elapsedTime * 1.4 + shape.userData.phase) * 0.5 + 0.5;
+      shape.scale.setScalar(0.88 + pulse * 0.22);
+      shape.rotation.z += deltaTime * (index === 1 ? -0.32 : 0.24);
+    });
+  }
 
   roundFragments.forEach((frag) => {
     const phase = frag.userData.phase;
@@ -1063,6 +1135,7 @@ function disposeRoundVisual() {
 }
 
 createRoundVisual();
+updateRoundVisualMode();
 updateRoundAnimation(roundAnimationTime, 0);
 
 let signPlaySoundText = null;
@@ -1117,6 +1190,7 @@ function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SE
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, crossfadeSec);
   updateSoundVariantButtons();
+  updateRoundVisualMode();
 }
 
 // --------------------------------------
@@ -1325,13 +1399,10 @@ aboutModal.innerHTML = `
     box-shadow: 0 0 34px rgba(102, 221, 255, 0.38), inset 0 0 22px rgba(255, 102, 204, 0.12);
     color: #f8fdff;
   ">
-    <h2 style="margin: 0 0 8px; font-size: clamp(26px, 4.8vw, 38px); line-height: 1.12; text-align: center;">寺岡アンジ / ANJI TERAOKA</h2>
+    <h2 style="margin: 0 0 8px; font-size: clamp(16px, 3vw, 22px); line-height: 1.12; text-align: center;">寺岡アンジ / ANJI TERAOKA</h2>
     <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(16px, 3vw, 22px); font-weight: 700; text-align: center;">ABOUT</p>
-    <p style="margin: 0 0 30px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
-      音楽と音楽を再生できるWebページの制作をしています。
-    </p>
-    <p style="margin: 0 0 34px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.5;">
-      I create music and web pages<br>where music can be played.
+    <p style="margin: 0 0 34px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
+      サイケデリックポップなどの宅録音楽を作っています。最近は、音楽と連動する3D Webの制作も行なっています。Ish Nurasとしても活動しています。
     </p>
     <div style="text-align: center;">
       <button type="button" data-about-close style="
