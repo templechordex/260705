@@ -676,6 +676,57 @@ signNewSong.position.set(
 );
 scene.add(signNewSong);
 
+function createNewSongArrowCue({ count = 3, size = 1.18, gap = 1.42, glow = '#ff66cc' } = {}) {
+  const group = new THREE.Group();
+  const arrows = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx2d = canvas.getContext('2d');
+    ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+    ctx2d.textAlign = 'center';
+    ctx2d.textBaseline = 'middle';
+    ctx2d.font = 'bold 190px sans-serif';
+    ctx2d.shadowColor = glow;
+    ctx2d.shadowBlur = 34;
+    ctx2d.fillStyle = '#ffffff';
+    ctx2d.fillText('↑', canvas.width / 2, canvas.height / 2 + 12);
+    ctx2d.shadowBlur = 16;
+    ctx2d.strokeStyle = glow;
+    ctx2d.lineWidth = 8;
+    ctx2d.strokeText('↑', canvas.width / 2, canvas.height / 2 + 12);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const geo = new THREE.PlaneGeometry(size, size);
+    const arrow = new THREE.Mesh(geo, mat);
+    arrow.position.x = (i - (count - 1) / 2) * gap;
+    arrow.userData.pulseOffset = i * 0.35;
+    arrow.userData._dispose = () => { tex.dispose(); geo.dispose(); mat.dispose(); };
+    group.add(arrow);
+    arrows.push(arrow);
+  }
+
+  group.userData.arrows = arrows;
+  return group;
+}
+
+const newSongArrowCue = createNewSongArrowCue();
+newSongArrowCue.position.set(
+  signNewSong.position.x,
+  signNewSong.position.y - 2.55,
+  -9.95
+);
+scene.add(newSongArrowCue);
+
 let signNewSongText = null;
 function buildNewSongText() {
   if (!uiFont || signNewSongText) return;
@@ -1197,7 +1248,7 @@ function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SE
 // BACK TO TOP button (bottom UI)
 // --------------------------------------
 const signBackTop = createSignBoardPlane({
-  width: 8, height: 2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+  width: 12.8, height: 2.2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
 });
 signBackTop.position.set(0, 0, -10);
 scene.add(signBackTop);
@@ -1217,7 +1268,7 @@ scene.add(signPie);
 let signBackTopText = null;
 function buildBackTopText() {
   if (!uiFont || signBackTopText) return;
-  signBackTopText = attachSignText(signBackTop, 'BACK TO TOP', 0.5, textMatWhite, 0.05);
+  signBackTopText = attachSignText(signBackTop, 'BACK to 3D HOME', 0.42, textMatWhite, 0.05);
 }
 
 let signAboutText = null;
@@ -1657,6 +1708,12 @@ function animate() {
   const tnow = performance.now() * 0.001;
   fillLight.intensity    = 0.8 + Math.cos(tnow * 0.3) * 0.3;
   updatePieAnimation(tnow);
+  newSongArrowCue.userData.arrows?.forEach((arrow) => {
+    const pulse = (Math.sin((tnow * 4.2) + arrow.userData.pulseOffset) + 1) * 0.5;
+    arrow.material.opacity = 0.58 + pulse * 0.42;
+    const scale = 0.92 + pulse * 0.16;
+    arrow.scale.setScalar(scale);
+  });
   updateSoundProgressBar();
   const roundFrameDelta = Math.min(dt, 0.05);
   if (isSoundPlaying) {
