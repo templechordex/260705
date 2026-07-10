@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ROUND SOUND</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; background: #02030a; }
+    canvas { display: block; }
+    .round-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .round-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      pointer-events: auto;
+    }
+    .round-button {
+      min-width: 220px;
+      padding: 22px 34px;
+      border: 1px solid rgba(235, 245, 255, 0.88);
+      border-radius: 999px;
+      background: rgba(4, 8, 18, 0.34);
+      box-shadow: 0 0 22px rgba(151, 195, 255, 0.34), inset 0 0 18px rgba(255, 255, 255, 0.12);
+      color: #f7fbff;
+      cursor: pointer;
+      font-size: clamp(32px, 7vw, 78px);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-shadow: 0 0 18px rgba(196, 219, 255, 0.95);
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .round-button:hover,
+    .round-button:focus-visible {
+      border-color: #ffffff;
+      box-shadow: 0 0 32px rgba(208, 225, 255, 0.72), inset 0 0 22px rgba(255, 255, 255, 0.2);
+      transform: scale(1.04);
+      outline: none;
+    }
+    .round-button.stop {
+      min-width: 150px;
+      padding: 13px 24px;
+      font-size: clamp(18px, 3.4vw, 34px);
+      letter-spacing: 0.1em;
+    }
+    .round-button[hidden] { display: none; }
+    .round-hint {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 4;
+      transform: translateX(-50%);
+      margin: 0;
+      color: rgba(226, 237, 255, 0.72);
+      font: 13px/1.5 Arial, Helvetica, sans-serif;
+      letter-spacing: 0.08em;
+      text-align: center;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="round-ui" aria-label="ROUND sound controls">
+    <div class="round-controls">
+      <button id="round-main-button" class="round-button" type="button">SOUND</button>
+      <button id="round-stop-button" class="round-button stop" type="button" hidden>STOP</button>
+    </div>
+  </div>
+  <p class="round-hint">CLICK ROUND OBJECTS TO CHANGE WHAT YOU HEAR</p>
+  <script type="module" src="round.js"></script>
+</body>
+</html>
