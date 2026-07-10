@@ -27,6 +27,88 @@ const pointer = new THREE.Vector2();
 const mainButton = document.getElementById('round-main-button');
 const stopButton = document.getElementById('round-stop-button');
 
+function applyAtStyleButtonLayout() {
+  const ui = document.querySelector('.round-ui');
+  const controls = document.querySelector('.round-controls');
+  const hint = document.querySelector('.round-hint');
+
+  if (ui) {
+    ui.style.cssText = `
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-family: Arial, Helvetica, sans-serif;
+    `;
+  }
+
+  if (controls) {
+    controls.style.cssText = `
+      position: relative;
+      display: grid;
+      justify-items: center;
+      gap: 16px;
+      pointer-events: auto;
+    `;
+  }
+
+  const sharedButtonStyle = `
+    border: 1px solid rgba(102, 221, 255, 0.82);
+    border-radius: 0;
+    background: linear-gradient(180deg, rgba(8, 18, 32, 0.62), rgba(3, 10, 20, 0.74));
+    box-shadow:
+      0 0 22px rgba(102, 221, 255, 0.38),
+      inset 0 0 18px rgba(255, 102, 204, 0.10);
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-align: center;
+    text-shadow: 0 0 14px rgba(102, 221, 255, 0.92);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 220ms ease;
+  `;
+
+  mainButton.style.cssText = `
+    ${sharedButtonStyle}
+    width: min(42vw, 250px);
+    height: min(18vw, 92px);
+    padding: 0;
+    font-size: clamp(24px, 5vw, 48px);
+    line-height: 1;
+  `;
+
+  stopButton.style.cssText = `
+    ${sharedButtonStyle}
+    width: min(30vw, 156px);
+    height: min(11vw, 52px);
+    padding: 0;
+    font-size: clamp(14px, 2.7vw, 24px);
+    line-height: 1;
+  `;
+
+  [mainButton, stopButton].forEach((button) => {
+    button.addEventListener('mouseenter', () => {
+      button.style.borderColor = 'rgba(255, 102, 204, 0.95)';
+      button.style.boxShadow = '0 0 30px rgba(255, 102, 204, 0.42), inset 0 0 18px rgba(102, 221, 255, 0.18)';
+      button.style.transform = 'scale(1.03)';
+    });
+    button.addEventListener('mouseleave', () => {
+      button.style.borderColor = 'rgba(102, 221, 255, 0.82)';
+      button.style.boxShadow = '0 0 22px rgba(102, 221, 255, 0.38), inset 0 0 18px rgba(255, 102, 204, 0.10)';
+      button.style.transform = 'scale(1)';
+    });
+  });
+
+  if (hint) {
+    hint.textContent = 'CLICK ROUND OBJECTS TO SWITCH SOUND';
+    hint.style.color = 'rgba(159, 238, 255, 0.68)';
+  }
+}
+applyAtStyleButtonLayout();
+
 const hemiLight = new THREE.HemisphereLight(0xd7e8ff, 0x050611, 1.25);
 scene.add(hemiLight);
 const centerLight = new THREE.PointLight(0xdbe7ff, 8, 46);
@@ -43,6 +125,8 @@ let activeTrackId = DEFAULT_TRACK;
 let hasStarted = false;
 let isOrbiting = false;
 let elapsed = 0;
+let revealProgress = 0;
+let roundModeProgress = 0;
 
 const {
   actx,
@@ -69,6 +153,7 @@ function createOrbitLine(radiusX, radiusY, tilt, color) {
     new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.2 })
   );
   line.rotation.set(tilt.x, tilt.y, tilt.z);
+  line.scale.setScalar(0.001);
   orbitRoot.add(line);
   orbitLines.push(line);
 }
@@ -86,6 +171,7 @@ function createRoundObject(index, config) {
     radiusY: config.radiusY,
     tilt: config.tilt,
     baseScale: config.scale,
+    currentSpread: 0,
   };
 
   const body = new THREE.Mesh(
@@ -113,6 +199,8 @@ function createRoundObject(index, config) {
   group.add(halo);
 
   orbitRoot.add(group);
+  group.position.set(0, 0, 0);
+  group.scale.setScalar(0.001);
   roundObjects.push(group);
 }
 
@@ -156,6 +244,14 @@ async function startSound() {
   hasStarted = true;
   isOrbiting = false;
   orbitRoot.visible = true;
+  revealProgress = 0;
+  roundModeProgress = 0;
+  roundObjects.forEach((obj) => {
+    obj.userData.currentSpread = 0;
+    obj.position.set(0, 0, 0);
+    obj.scale.setScalar(0.001);
+  });
+  orbitLines.forEach((line) => line.scale.setScalar(0.001));
   selectTrack(DEFAULT_TRACK, 0);
   await playBgmElements();
   updateButtonState();
@@ -176,6 +272,14 @@ function stopRound() {
   hasStarted = false;
   isOrbiting = false;
   orbitRoot.visible = false;
+  revealProgress = 0;
+  roundModeProgress = 0;
+  roundObjects.forEach((obj) => {
+    obj.userData.currentSpread = 0;
+    obj.position.set(0, 0, 0);
+    obj.scale.setScalar(0.001);
+  });
+  orbitLines.forEach((line) => line.scale.setScalar(0.001));
   selectTrack(DEFAULT_TRACK, 0);
   updateButtonState();
 }
@@ -211,25 +315,50 @@ window.addEventListener('click', (event) => {
 
 function updateRoundObjects(delta) {
   elapsed += delta;
-  const spinBoost = isOrbiting ? 4.6 : 0.45;
-  orbitRoot.rotation.z += delta * (isOrbiting ? 0.18 : 0.025);
-  core.scale.setScalar(1 + Math.sin(elapsed * 2.2) * 0.16);
-  centerLight.intensity = isOrbiting ? 10 + Math.sin(elapsed * 5) * 2.2 : 5.5;
+  const revealTarget = hasStarted ? 1 : 0;
+  const roundTarget = isOrbiting ? 1 : 0;
+  revealProgress = THREE.MathUtils.damp(revealProgress, revealTarget, 1.55, delta);
+  roundModeProgress = THREE.MathUtils.damp(roundModeProgress, roundTarget, 1.35, delta);
+
+  const revealEase = revealProgress * revealProgress * (3 - 2 * revealProgress);
+  const roundEase = roundModeProgress * roundModeProgress * (3 - 2 * roundModeProgress);
+  const spreadBreath = 1 + Math.sin(elapsed * 0.9) * 0.018 * revealEase;
+  const spinBoost = THREE.MathUtils.lerp(0.45, 4.6, roundEase);
+  const rootSpin = THREE.MathUtils.lerp(0.025, 0.18, roundEase);
+  orbitRoot.rotation.z += delta * rootSpin;
+  core.scale.setScalar((0.35 + revealEase * 0.65) * (1 + Math.sin(elapsed * 2.2) * (0.1 + roundEase * 0.12)));
+  core.material.opacity = 0.18 + revealEase * (0.48 + roundEase * 0.18);
+  centerLight.intensity = THREE.MathUtils.lerp(3.2, 10 + Math.sin(elapsed * 5) * 2.2, roundEase) * (0.35 + revealEase * 0.65);
 
   roundObjects.forEach((obj, index) => {
     const data = obj.userData;
     const orbit = data.phase + elapsed * data.speed * spinBoost;
-    const local = new THREE.Vector3(Math.cos(orbit) * data.radiusX, Math.sin(orbit) * data.radiusY, 0);
+    const stagger = THREE.MathUtils.clamp((revealEase - index * 0.055) / 0.72, 0, 1);
+    const staggerEase = stagger * stagger * (3 - 2 * stagger);
+    const roundExpansion = 1 + roundEase * (0.28 + index * 0.022);
+    const spread = staggerEase * roundExpansion * spreadBreath;
+    data.currentSpread = THREE.MathUtils.damp(data.currentSpread, spread, 3.4, delta);
+
+    const local = new THREE.Vector3(
+      Math.cos(orbit) * data.radiusX * data.currentSpread,
+      Math.sin(orbit) * data.radiusY * data.currentSpread,
+      Math.sin(orbit * 0.7 + index) * roundEase * 0.52
+    );
     local.applyEuler(data.tilt);
     obj.position.copy(local);
     obj.rotation.x += delta * (0.28 + index * 0.03) * spinBoost;
     obj.rotation.y += delta * (0.36 + index * 0.02) * spinBoost;
-    const activePulse = data.trackId === activeTrackId ? 0.22 + Math.sin(elapsed * 5.5) * 0.08 : 0;
-    obj.scale.setScalar(data.baseScale * (1 + activePulse));
+    const activePulse = data.trackId === activeTrackId ? 0.18 + Math.sin(elapsed * 5.5) * 0.08 : 0;
+    const roundPulse = roundEase * (0.22 + Math.sin(elapsed * 3.2 + index) * 0.06);
+    obj.scale.setScalar(Math.max(0.001, data.baseScale * staggerEase * (1 + activePulse + roundPulse)));
   });
 
   orbitLines.forEach((line, index) => {
-    line.material.opacity = isOrbiting ? 0.28 + Math.sin(elapsed * 2 + index) * 0.08 : 0.14;
+    const stagger = THREE.MathUtils.clamp((revealEase - index * 0.045) / 0.7, 0, 1);
+    const staggerEase = stagger * stagger * (3 - 2 * stagger);
+    const roundExpansion = 1 + roundEase * (0.28 + index * 0.022);
+    line.scale.setScalar(Math.max(0.001, staggerEase * roundExpansion * spreadBreath));
+    line.material.opacity = staggerEase * THREE.MathUtils.lerp(0.14, 0.28 + Math.sin(elapsed * 2 + index) * 0.08, roundEase);
   });
 }
 
