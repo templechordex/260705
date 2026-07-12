@@ -3,6 +3,7 @@
 
 import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
 import { createSceneCameraRenderer } from './core/scene.js';
+import { createLoadingManager } from './core/loadingScreen.js';
 import { createPsyAudioGraph } from './audio/psyAudio.js';
 
 const TRACKS = [
@@ -14,11 +15,14 @@ const DEFAULT_TRACK = 'round';
 const DRY_TRACK = 'round_dry';
 const CROSSFADE_SEC = 2.4;
 
-const { scene, camera, renderer } = createSceneCameraRenderer(THREE, { exposure: 0.86 });
-renderer.setClearColor(0x02030a, 1);
+const { scene, camera, renderer } = createSceneCameraRenderer(THREE, { exposure: 0.86, far: 1800 });
+const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING ROUND' });
+document.getElementById('round-initial-loading')?.remove();
+loadingManager.itemStart('round-scene');
+renderer.setClearColor(0x02040f, 1);
 camera.position.set(0, 0, 22);
 camera.lookAt(0, 0, 0);
-scene.fog = new THREE.FogExp2(0x02030a, 0.024);
+scene.fog = new THREE.FogExp2(0x02040f, 0.024);
 
 const clock = new THREE.Clock();
 const raycaster = new THREE.Raycaster();
@@ -27,87 +31,47 @@ const pointer = new THREE.Vector2();
 const mainButton = document.getElementById('round-main-button');
 const stopButton = document.getElementById('round-stop-button');
 
-function applyAtStyleButtonLayout() {
-  const ui = document.querySelector('.round-ui');
-  const controls = document.querySelector('.round-controls');
-  const hint = document.querySelector('.round-hint');
-
-  if (ui) {
-    ui.style.cssText = `
-      position: fixed;
-      inset: 0;
-      z-index: 5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      font-family: Arial, Helvetica, sans-serif;
-    `;
+function createStarField() {
+  const starCount = 1200;
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const radius = 260 + Math.random() * 1500;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(THREE.MathUtils.randFloatSpread(2));
+    positions[i * 3] = Math.sin(phi) * Math.cos(theta) * radius;
+    positions[i * 3 + 1] = Math.cos(phi) * radius * 0.55;
+    positions[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * radius;
   }
 
-  if (controls) {
-    controls.style.cssText = `
-      position: relative;
-      display: grid;
-      justify-items: center;
-      gap: 16px;
-      pointer-events: auto;
-    `;
-  }
-
-  const sharedButtonStyle = `
-    border: 1px solid rgba(102, 221, 255, 0.82);
-    border-radius: 0;
-    background: linear-gradient(180deg, rgba(8, 18, 32, 0.62), rgba(3, 10, 20, 0.74));
-    box-shadow:
-      0 0 22px rgba(102, 221, 255, 0.38),
-      inset 0 0 18px rgba(255, 102, 204, 0.10);
-    color: #ffffff;
-    cursor: pointer;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-align: center;
-    text-shadow: 0 0 14px rgba(102, 221, 255, 0.92);
-    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 220ms ease;
-  `;
-
-  mainButton.style.cssText = `
-    ${sharedButtonStyle}
-    width: min(42vw, 250px);
-    height: min(18vw, 92px);
-    padding: 0;
-    font-size: clamp(24px, 5vw, 48px);
-    line-height: 1;
-  `;
-
-  stopButton.style.cssText = `
-    ${sharedButtonStyle}
-    width: min(30vw, 156px);
-    height: min(11vw, 52px);
-    padding: 0;
-    font-size: clamp(14px, 2.7vw, 24px);
-    line-height: 1;
-  `;
-
-  [mainButton, stopButton].forEach((button) => {
-    button.addEventListener('mouseenter', () => {
-      button.style.borderColor = 'rgba(255, 102, 204, 0.95)';
-      button.style.boxShadow = '0 0 30px rgba(255, 102, 204, 0.42), inset 0 0 18px rgba(102, 221, 255, 0.18)';
-      button.style.transform = 'scale(1.03)';
-    });
-    button.addEventListener('mouseleave', () => {
-      button.style.borderColor = 'rgba(102, 221, 255, 0.82)';
-      button.style.boxShadow = '0 0 22px rgba(102, 221, 255, 0.38), inset 0 0 18px rgba(255, 102, 204, 0.10)';
-      button.style.transform = 'scale(1)';
-    });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xdff8ff,
+    size: 1.6,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+    fog: false,
   });
-
-  if (hint) {
-    hint.textContent = 'CLICK ROUND OBJECTS TO SWITCH SOUND';
-    hint.style.color = 'rgba(159, 238, 255, 0.68)';
-  }
+  return new THREE.Points(geo, mat);
 }
-applyAtStyleButtonLayout();
+
+const starField = createStarField();
+scene.add(starField);
+
+const pieNebula = new THREE.Mesh(
+  new THREE.TorusKnotGeometry(34, 7, 180, 18),
+  new THREE.MeshBasicMaterial({
+    color: 0xff66cc,
+    transparent: true,
+    opacity: 0.055,
+    depthWrite: false,
+    fog: false,
+  })
+);
+pieNebula.position.set(0, -4, -28);
+pieNebula.scale.set(1.5, 0.62, 1.5);
+scene.add(pieNebula);
 
 const hemiLight = new THREE.HemisphereLight(0xd7e8ff, 0x050611, 1.25);
 scene.add(hemiLight);
@@ -222,7 +186,9 @@ orbitRoot.add(core);
 
 function updateButtonState() {
   mainButton.textContent = hasStarted ? 'ROUND' : 'SOUND';
-  stopButton.hidden = !hasStarted;
+  stopButton.classList.toggle('is-visible', hasStarted);
+  stopButton.setAttribute('aria-hidden', String(!hasStarted));
+  stopButton.tabIndex = hasStarted ? 0 : -1;
   mainButton.setAttribute('aria-pressed', String(isOrbiting));
 }
 
@@ -372,10 +338,14 @@ window.addEventListener('resize', onResize);
 function animate() {
   requestAnimationFrame(animate);
   const delta = Math.min(clock.getDelta(), 0.05);
+  starField.rotation.y += delta * 0.006;
+  pieNebula.rotation.x += delta * 0.015;
+  pieNebula.rotation.y += delta * 0.01;
   if (orbitRoot.visible) updateRoundObjects(delta);
   renderer.render(scene, camera);
 }
 updateButtonState();
+requestAnimationFrame(() => loadingManager.itemEnd('round-scene'));
 animate();
 
 window.addEventListener('beforeunload', () => {
