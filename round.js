@@ -17,6 +17,7 @@ const CROSSFADE_SEC = 2.4;
 
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, { exposure: 0.86, far: 1800 });
 const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING ROUND' });
+document.getElementById('round-initial-loading')?.remove();
 loadingManager.itemStart('round-scene');
 renderer.setClearColor(0x02040f, 1);
 camera.position.set(0, 0, 22);
@@ -50,6 +51,7 @@ function createStarField() {
     transparent: true,
     opacity: 0.88,
     depthWrite: false,
+    fog: false,
   });
   return new THREE.Points(geo, mat);
 }
@@ -64,6 +66,7 @@ const pieNebula = new THREE.Mesh(
     transparent: true,
     opacity: 0.055,
     depthWrite: false,
+    fog: false,
   })
 );
 pieNebula.position.set(0, -4, -28);
