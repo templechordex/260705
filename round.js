@@ -180,15 +180,15 @@ orbitConfigs.forEach((config, index) => createRoundObject(index, config));
 
 
 const samsaraConfig = {
-  radius: 4.15,
+  radius: 8.9,
   rotationSpeed: 0.032,
   objectScale: 0.68,
   particleCount: 96,
   satelliteSpeed: 0.42,
-  desktopPosition: new THREE.Vector3(0, 0.45, -6.8),
-  mobilePosition: new THREE.Vector3(0, 1.2, -7.8),
+  desktopPosition: new THREE.Vector3(0, 0, -2.4),
+  mobilePosition: new THREE.Vector3(0, 0.45, -2.8),
   desktopScale: 1.0,
-  mobileScale: 0.68,
+  mobileScale: 0.56,
 };
 
 function createSamsaraRing(radius, tilt, color, opacity = 0.18) {
@@ -314,7 +314,7 @@ function createSamsaraOrbit() {
   const root = new THREE.Group();
   root.name = 'samsaraOrbit';
   root.position.copy(samsaraConfig.desktopPosition);
-  root.rotation.set(-0.08, 0.34, -0.12);
+  root.rotation.set(0, 0, 0);
   root.scale.setScalar(samsaraConfig.desktopScale);
 
   const wheel = new THREE.Group();
@@ -341,7 +341,7 @@ function createSamsaraOrbit() {
   );
   root.add(core, coreAura);
 
-  const samsaraLight = new THREE.PointLight(0xffd89a, 1.7, 18);
+  const samsaraLight = new THREE.PointLight(0xffd89a, 1.7, 28);
   samsaraLight.position.set(0, 0, 1.4);
   root.add(samsaraLight);
 
