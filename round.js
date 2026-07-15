@@ -15,6 +15,7 @@ const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
 const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING ROUND' });
 renderer.toneMapping = THREE.CineonToneMapping;
 camera.lookAt(0, 0, 0);
+renderer.domElement.style.touchAction = 'none';
 
 scene.fog = new THREE.FogExp2(0x050510, 0.012);
 scene.add(new THREE.HemisphereLight(0x9fdcff, 0x101827, 1.25));
@@ -449,8 +450,16 @@ function getClickableRoot(object) {
   while (current && !clickableSet.has(current)) current = current.parent;
   return current;
 }
-function handleClick(event) {
-  _v2.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+function setPointerFromCanvasEvent(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  _v2.set(x * 2 - 1, -(y * 2 - 1));
+}
+
+function handlePointerUp(event) {
+  if (event.pointerType && event.isPrimary === false) return;
+  setPointerFromCanvasEvent(event);
   _raycaster.setFromCamera(_v2, camera);
   const intersects = _raycaster.intersectObjects(clickableA, true);
   if (!intersects.length) return;
@@ -461,11 +470,7 @@ function handleClick(event) {
     toggleSongPlayback();
   }
 }
-window.addEventListener('click', handleClick, false);
-window.addEventListener('touchend', (event) => {
-  const touch = event.changedTouches?.[0];
-  if (touch) handleClick({ clientX: touch.clientX, clientY: touch.clientY });
-}, { passive: true });
+renderer.domElement.addEventListener('pointerup', handlePointerUp, false);
 
 let resizePending = false;
 function onWindowResize() {
