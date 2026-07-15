@@ -12,7 +12,7 @@ const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
   exposure: 0.9,
   cameraPosition: [0, 0, 24],
 });
-createLoadingManager(THREE, renderer, { title: 'LOADING ROUND' });
+const loadingManager = createLoadingManager(THREE, renderer, { title: 'LOADING ROUND' });
 renderer.toneMapping = THREE.CineonToneMapping;
 camera.lookAt(0, 0, 0);
 
@@ -32,7 +32,7 @@ const _v2 = new THREE.Vector2();
 const _raycaster = new THREE.Raycaster();
 const clock = new THREE.Clock();
 const textMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const fontLoader = new FontLoader();
+const fontLoader = new FontLoader(loadingManager);
 let uiFont = null;
 
 function createSignBoardPlane(options = {}) {
