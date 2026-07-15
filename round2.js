@@ -97,8 +97,39 @@ function createStreamingButtons() {
     wrap.appendChild(a);
   });
   document.body.appendChild(wrap);
+  return wrap;
 }
-createStreamingButtons();
+const streamingButtonsWrap = createStreamingButtons();
+
+let visualFocusMode = false;
+const visualButton = document.createElement('button');
+visualButton.type = 'button';
+visualButton.textContent = 'visual';
+visualButton.setAttribute('aria-pressed', 'false');
+visualButton.style.cssText = `
+  position: fixed;
+  z-index: 12;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 124px;
+  padding: 12px 22px;
+  border: 1px solid rgba(255,255,255,0.78);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(111,92,255,0.9), rgba(255,109,159,0.82));
+  box-shadow: 0 0 28px rgba(255, 109, 159, 0.34), inset 0 0 18px rgba(255,255,255,0.14);
+  cursor: pointer;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+`;
+visualButton.addEventListener('click', () => {
+  setVisualFocusMode(!visualFocusMode);
+});
+document.body.appendChild(visualButton);
 
 // SOUND button moved to the world origin. Other copied sound objects keep their relative offsets.
 const signPlaySound = createSignBoardPlane({
@@ -158,7 +189,7 @@ function updateSoundVariantButtons() {
   });
 }
 function setSoundVariantButtonsVisible(visible) {
-  soundVariantButtons.forEach((button) => { button.visible = visible; });
+  soundVariantButtons.forEach((button) => { button.visible = visible && !visualFocusMode; });
 }
 function buildSoundVariantTexts() {
   if (!uiFont || soundVariantTexts.length) return;
@@ -174,6 +205,22 @@ function updateSoundProgressBar() {
   const progress = duration > 0 ? THREE.MathUtils.clamp(currentBgmElement.currentTime / duration, 0, 1) : 0;
   soundProgressFill.scale.x = Math.max(progress, 0.0001);
   soundProgressFill.position.x = (progress - 1) * soundProgressConfig.width * 0.5;
+}
+
+function setVisualFocusMode(enabled) {
+  visualFocusMode = enabled;
+  visualButton.setAttribute('aria-pressed', String(enabled));
+  visualButton.style.background = enabled
+    ? 'linear-gradient(135deg, rgba(255,209,102,0.94), rgba(80,240,208,0.82))'
+    : 'linear-gradient(135deg, rgba(111,92,255,0.9), rgba(255,109,159,0.82))';
+  visualButton.style.boxShadow = enabled
+    ? '0 0 30px rgba(80, 240, 208, 0.38), inset 0 0 18px rgba(255,255,255,0.18)'
+    : '0 0 28px rgba(255, 109, 159, 0.34), inset 0 0 18px rgba(255,255,255,0.14)';
+
+  streamingButtonsWrap.style.display = enabled ? 'none' : 'flex';
+  signPlaySound.visible = !enabled;
+  soundProgressGroup.visible = !enabled;
+  setSoundVariantButtonsVisible(isSoundPlaying);
 }
 
 const ROUND_CONFIG = {
