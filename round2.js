@@ -159,9 +159,9 @@ soundProgressFill.scale.x = 0.0001;
 soundProgressGroup.add(soundProgressFill);
 
 const soundVariantOptions = [
-  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
-  { id: 'round_dry', label: 'Dry', url: 'audio/round_dry.mp3' },
-  { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
+  { id: 'round', label: 'Center', url: 'audio/round.mp3' },
+  { id: 'round_dry', label: 'Round A', url: 'audio/round_dry.mp3' },
+  { id: 'round_roomy', label: 'Round B', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
 const SOUND_VARIANT_CROSSFADE_SEC = 3.2;
@@ -235,12 +235,18 @@ const ROUND_CONFIG = {
   animationSpeed: 1,
   centerGlowIntensity: 1.05,
 };
+const ROUND_MOTION_MODES = {
+  round: { rotationSpeed: 0, complexRotation: false },
+  round_dry: { rotationSpeed: 1, complexRotation: false },
+  round_roomy: { rotationSpeed: 1.65, complexRotation: true },
+};
 const roundGroup = new THREE.Group();
 roundGroup.position.set(ROUND_CONFIG.position.x, ROUND_CONFIG.position.y, ROUND_CONFIG.position.z);
 roundGroup.scale.setScalar(ROUND_CONFIG.scale);
 scene.add(roundGroup);
 
 let roundAnimationTime = 0;
+let roundMotionTime = 0;
 const roundRings = [];
 const roundParticles = [];
 const roundFragments = [];
@@ -248,21 +254,11 @@ let roundCore;
 let roundCoreShell;
 let roundMist;
 let roundGlowLight;
-let roundBasicShapesGroup;
 let roundOrbitWheel;
 let roundSpokesGroup;
 let roundPlanetGroup;
 let roundGateGroup;
-const ROUND_DRY_GRAY = 0x9a9a9a;
 
-function rememberRoundMaterialColor(material) {
-  if (material?.color && material.userData.originalColor === undefined) material.userData.originalColor = material.color.getHex();
-}
-function setRoundMaterialDry(material, dry) {
-  if (!material?.color) return;
-  rememberRoundMaterialColor(material);
-  material.color.setHex(dry ? ROUND_DRY_GRAY : material.userData.originalColor);
-}
 function createRoundVisual() {
   const coreMat = new THREE.MeshBasicMaterial({ color: 0xfff4dd, transparent: true, opacity: 0.86 });
   roundCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 1), coreMat);
@@ -350,43 +346,12 @@ function createRoundVisual() {
     roundFragments.push(frag);
     roundPlanetGroup.add(frag);
   }
-  roundBasicShapesGroup = new THREE.Group();
-  roundBasicShapesGroup.visible = false;
-  const basicShapeMat = new THREE.MeshBasicMaterial({ color: 0xf0f2f4, transparent: true, opacity: 0.74, depthWrite: false, side: THREE.DoubleSide });
-  [
-    { geo: new THREE.CircleGeometry(0.42, 48), x: -1.1 },
-    { geo: new THREE.CircleGeometry(0.48, 3), x: 0 },
-    { geo: new THREE.PlaneGeometry(0.82, 0.82), x: 1.1 },
-  ].forEach(({ geo, x }, index) => {
-    const shape = new THREE.Mesh(geo, basicShapeMat.clone());
-    shape.position.set(x, 0, 0.18);
-    shape.userData.phase = index * 2.1;
-    roundBasicShapesGroup.add(shape);
-  });
-  roundGroup.add(roundBasicShapesGroup);
-}
-function updateRoundVisualMode() {
-  const dry = activeSoundVariant === 'round_dry';
-  const basic = activeSoundVariant === 'round_roomy';
-  roundGroup.traverse((obj) => {
-    if (!obj.isMesh) return;
-    if (Array.isArray(obj.material)) obj.material.forEach((mat) => setRoundMaterialDry(mat, dry));
-    else setRoundMaterialDry(obj.material, dry);
-  });
-  if (roundGlowLight) roundGlowLight.color.setHex(dry ? ROUND_DRY_GRAY : roundGlowLight.userData.originalColor);
-  roundBasicShapesGroup.visible = basic;
-  roundCore.visible = !basic;
-  roundCoreShell.visible = !basic;
-  roundMist.visible = !basic;
-  roundRings.forEach((ring) => { ring.visible = !basic; });
-  roundParticles.forEach((p) => { p.visible = !basic; });
-  roundFragments.forEach((frag) => { frag.visible = !basic; });
-  roundOrbitWheel.visible = !basic;
-  roundSpokesGroup.visible = !basic;
-  roundPlanetGroup.visible = !basic;
-  roundGateGroup.visible = !basic;
 }
 function updateRoundAnimation(elapsedTime, deltaTime) {
+  const motionMode = ROUND_MOTION_MODES[activeSoundVariant] ?? ROUND_MOTION_MODES.round;
+  const motionDelta = deltaTime * motionMode.rotationSpeed;
+  roundMotionTime += motionDelta;
+  const motionTime = roundMotionTime;
   const slowPulse = Math.sin(elapsedTime * 0.75) * 0.5 + 0.5;
   const shellPulse = Math.sin(elapsedTime * 0.52 + 1.2) * 0.5 + 0.5;
   const mistPulse = Math.sin(elapsedTime * 0.33 + 2.1) * 0.5 + 0.5;
@@ -397,32 +362,32 @@ function updateRoundAnimation(elapsedTime, deltaTime) {
   roundCore.material.opacity = 0.58 + slowPulse * 0.22;
   roundCoreShell.scale.setScalar(0.92 + shellPulse * 0.28);
   roundCoreShell.material.opacity = 0.09 + shellPulse * 0.12;
-  roundMist.rotation.y += deltaTime * 0.045;
-  roundMist.rotation.z -= deltaTime * 0.036;
+  roundMist.rotation.y += motionDelta * 0.045;
+  roundMist.rotation.z -= motionDelta * 0.036;
   roundMist.material.opacity = 0.055 + mistPulse * 0.055;
   roundGlowLight.intensity = ROUND_CONFIG.centerGlowIntensity * (0.65 + slowPulse * 0.45);
-  roundOrbitWheel.rotation.z += deltaTime * 0.08;
-  roundOrbitWheel.rotation.x = Math.sin(elapsedTime * 0.22) * 0.11;
-  roundSpokesGroup.rotation.z -= deltaTime * 0.14;
+  roundOrbitWheel.rotation.z += motionDelta * 0.08;
+  roundOrbitWheel.rotation.x = Math.sin(motionTime * 0.22) * 0.11;
+  roundSpokesGroup.rotation.z -= motionDelta * 0.14;
   roundSpokesGroup.children.forEach((spoke) => {
     spoke.material.opacity = 0.32 + (Math.sin(elapsedTime * 1.35 + spoke.userData.phase) * 0.5 + 0.5) * 0.22;
   });
-  roundGateGroup.rotation.z += deltaTime * 0.18;
+  roundGateGroup.rotation.z += motionDelta * 0.18;
   roundGateGroup.children.forEach((gate, index) => {
     const wheelAngle = gate.userData.angle + roundGateGroup.rotation.z;
     const sway = Math.sin(elapsedTime * 0.9 + gate.userData.phase) * 0.16;
     gate.position.set(Math.cos(wheelAngle) * gate.userData.radius, Math.sin(wheelAngle) * gate.userData.radius, 0.32 + sway);
-    gate.rotation.z = -roundGateGroup.rotation.z + Math.sin(elapsedTime * 0.7 + index) * 0.18;
+    gate.rotation.z = -roundGateGroup.rotation.z + Math.sin(motionTime * 0.7 + index) * 0.18;
     gate.scale.setScalar(0.86 + (Math.sin(elapsedTime * 1.1 + index) * 0.5 + 0.5) * 0.22);
   });
   roundRings.forEach((ring, i) => {
-    ring.rotation.x += ring.userData.speed * deltaTime;
-    ring.rotation.y += ring.userData.speed * deltaTime * (0.55 + i * 0.08);
-    ring.rotation.z += Math.sin(elapsedTime * 0.18 + i) * ring.userData.wobble * deltaTime * 0.12;
+    ring.rotation.x += ring.userData.speed * motionDelta;
+    ring.rotation.y += ring.userData.speed * motionDelta * (0.55 + i * 0.08);
+    ring.rotation.z += Math.sin(motionTime * 0.18 + i) * ring.userData.wobble * motionDelta * 0.12;
   });
   roundParticles.forEach((p, i) => {
     const phase = p.userData.phase;
-    const orbit = phase + elapsedTime * p.userData.speed;
+    const orbit = phase + motionTime * p.userData.speed;
     const orbitBand = i % 6;
     const pull = Math.sin(elapsedTime * 0.41 + phase) * 0.24;
     let radius = 1.02 + orbitBand * 0.33 + pull;
@@ -434,25 +399,40 @@ function updateRoundAnimation(elapsedTime, deltaTime) {
     p.position.set(x, y, z);
     p.scale.setScalar(0.72 + (Math.sin(elapsedTime * 1.6 + phase) * 0.5 + 0.5) * 0.74);
   });
-  if (roundBasicShapesGroup?.visible) {
-    roundBasicShapesGroup.children.forEach((shape, index) => {
-      const pulse = Math.sin(elapsedTime * 1.4 + shape.userData.phase) * 0.5 + 0.5;
-      shape.scale.setScalar(0.88 + pulse * 0.22);
-      shape.rotation.z += deltaTime * (index === 1 ? -0.32 : 0.24);
-    });
-  }
   roundFragments.forEach((frag) => {
     const phase = frag.userData.phase;
-    const orbit = phase + elapsedTime * frag.userData.speed;
+    const orbit = phase + motionTime * frag.userData.speed;
     const breathe = 0.78 + Math.sin(orbit * 1.7) * 0.18;
     const x = Math.cos(orbit) * frag.userData.radiusX * breathe;
     const y = Math.sin(orbit * 1.21) * frag.userData.radiusY;
     const z = Math.sin(orbit) * frag.userData.radiusX * 0.42 * breathe;
     const tilt = frag.userData.tilt;
     frag.position.set(x, y * Math.cos(tilt) - z * Math.sin(tilt), y * Math.sin(tilt) + z * Math.cos(tilt));
-    frag.rotation.x += deltaTime * 0.21;
-    frag.rotation.y -= deltaTime * 0.16;
+    frag.rotation.x += motionDelta * 0.21;
+    frag.rotation.y -= motionDelta * 0.16;
   });
+
+  if (motionMode.complexRotation) {
+    roundGroup.rotation.x = Math.sin(motionTime * 0.21) * 0.16;
+    roundGroup.rotation.y += motionDelta * 0.09;
+    roundGroup.rotation.z = Math.cos(motionTime * 0.17) * 0.07;
+    roundOrbitWheel.rotation.y = Math.sin(motionTime * 0.37) * 0.28;
+    roundSpokesGroup.rotation.x = Math.cos(motionTime * 0.31) * 0.2;
+    roundSpokesGroup.rotation.y = Math.sin(motionTime * 0.26) * 0.16;
+    roundPlanetGroup.rotation.x = Math.sin(motionTime * 0.19) * 0.24;
+    roundPlanetGroup.rotation.y -= motionDelta * 0.1;
+    roundGateGroup.rotation.x = Math.cos(motionTime * 0.29) * 0.18;
+    roundGateGroup.rotation.y = Math.sin(motionTime * 0.23) * 0.22;
+  } else {
+    roundGroup.rotation.set(0, 0, 0);
+    roundOrbitWheel.rotation.y = 0;
+    roundSpokesGroup.rotation.x = 0;
+    roundSpokesGroup.rotation.y = 0;
+    roundPlanetGroup.rotation.x = 0;
+    roundPlanetGroup.rotation.y = 0;
+    roundGateGroup.rotation.x = 0;
+    roundGateGroup.rotation.y = 0;
+  }
 }
 function updateRoundStopped(deltaTime) {
   const resetStep = Math.min(1, deltaTime * ROUND_CONFIG.resetScaleSpeed);
@@ -462,7 +442,6 @@ function setRoundAnimationPlaying(playing) {
   isSoundPlaying = playing;
 }
 createRoundVisual();
-updateRoundVisualMode();
 updateRoundAnimation(roundAnimationTime, 0);
 
 let signPlaySoundText = null;
@@ -505,7 +484,6 @@ function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SE
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, crossfadeSec);
   updateSoundVariantButtons();
-  updateRoundVisualMode();
 }
 function toggleSongPlayback() {
   if (actx.state !== 'running') actx.resume();
