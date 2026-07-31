@@ -6,7 +6,7 @@ import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geome
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createLoadingManager } from './core/loadingScreen.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
-import { createSyncedBgmPlayer } from './audio/syncedBgm.js';
+import { createSyncedBgmPlayer } from './audio/syncedBgm.js?v=20260731-streaming';
 
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
   exposure: 0.9,
