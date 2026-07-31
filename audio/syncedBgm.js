@@ -1,4 +1,6 @@
 // Sample-aligned looping and crossfading for alternate renders of one song.
+// Only the active track is decoded. During a crossfade, the incoming track is
+// decoded as well, then the outgoing AudioBuffer is released.
 export function createSyncedBgmPlayer({
   tracks,
   initialTrackId,
@@ -15,24 +17,27 @@ export function createSyncedBgmPlayer({
 
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const initialId = trackIds.has(initialTrackId) ? initialTrackId : tracks[0].id;
+  const encodedTracks = new Map(tracks.map((track) => [
+    track.id,
+    { ...track, arrayBuffer: null },
+  ]));
+  const decodedBuffers = new Map();
+
   let activeTrackId = initialId;
   let actx = null;
   let masterGain = null;
-  let trackStates = null;
   let preloadPromise = null;
   let loadPromise = null;
   let loopDuration = 0;
   let isPlaying = false;
   let pendingPlay = null;
+  let transitionPromise = null;
+  let transitionGeneration = 0;
+  let requestedCrossfadeSec = defaultCrossfadeSec;
   let sourceEntries = [];
   let startOffset = 0;
   let startedAtContextTime = 0;
   let pausedOffset = 0;
-
-  const encodedTracks = new Map(tracks.map((track) => [
-    track.id,
-    { ...track, arrayBuffer: null },
-  ]));
 
   function ensureAudioGraph() {
     if (actx) return;
@@ -40,18 +45,24 @@ export function createSyncedBgmPlayer({
       throw new Error('Web Audio API is not supported in this browser.');
     }
 
-    // iOS/WebKit requires the AudioContext to be created from a user gesture.
+    // This is called synchronously from the pointer handler.
     actx = new AudioContextClass();
     masterGain = actx.createGain();
     masterGain.gain.value = 1;
     masterGain.connect(actx.destination);
+  }
 
-    trackStates = new Map(tracks.map((track) => {
-      const gain = actx.createGain();
-      gain.gain.value = track.id === activeTrackId ? 1 : 0;
-      gain.connect(masterGain);
-      return [track.id, { ...track, buffer: null, gain }];
-    }));
+  function unlockFromUserGesture() {
+    ensureAudioGraph();
+
+    // Starting a silent, one-sample buffer inside the first tap reliably
+    // unlocks Web Audio on iOS/WebKit while the MP3 is decoded asynchronously.
+    const source = actx.createBufferSource();
+    source.buffer = actx.createBuffer(1, 1, actx.sampleRate);
+    source.connect(masterGain);
+    source.start(0);
+
+    return actx.state === 'running' ? Promise.resolve() : actx.resume();
   }
 
   function normalizeOffset(seconds) {
@@ -59,30 +70,15 @@ export function createSyncedBgmPlayer({
     return ((seconds % loopDuration) + loopDuration) % loopDuration;
   }
 
-  function holdParamAtCurrentValue(param, time) {
-    if (typeof param.cancelAndHoldAtTime === 'function') {
-      param.cancelAndHoldAtTime(time);
-      return;
-    }
-    const currentValue = param.value;
-    param.cancelScheduledValues(time);
-    param.setValueAtTime(currentValue, time);
+  function getCurrentTimeAt(contextTime) {
+    if (!isPlaying) return normalizeOffset(pausedOffset);
+    const elapsed = Math.max(0, contextTime - startedAtContextTime);
+    return normalizeOffset(startOffset + elapsed);
   }
 
-  function setTrackGains(durationSec = 0) {
-    if (!actx || !trackStates) return;
-    const now = actx.currentTime;
-    const duration = Math.max(0, durationSec);
-
-    trackStates.forEach((track) => {
-      const target = track.id === activeTrackId ? 1 : 0;
-      holdParamAtCurrentValue(track.gain.gain, now);
-      if (duration === 0 || !isPlaying) {
-        track.gain.gain.setValueAtTime(target, now);
-      } else {
-        track.gain.gain.linearRampToValueAtTime(target, now + duration);
-      }
-    });
+  function getCurrentTime() {
+    if (!actx || !isPlaying) return normalizeOffset(pausedOffset);
+    return getCurrentTimeAt(actx.currentTime);
   }
 
   async function fetchTrack(track) {
@@ -109,90 +105,194 @@ export function createSyncedBgmPlayer({
     return preloadPromise;
   }
 
-  async function decodeTrack(track) {
-    const encodedTrack = encodedTracks.get(track.id);
+  async function decodeTrack(trackId) {
+    const cached = decodedBuffers.get(trackId);
+    if (cached) return cached;
+
+    const encodedTrack = encodedTracks.get(trackId);
     if (!encodedTrack?.arrayBuffer) {
-      throw new Error(`Track data was not preloaded for ${track.id}.`);
+      await preload();
     }
+
     // Safari may detach the supplied ArrayBuffer while decoding, so decode a copy.
-    return actx.decodeAudioData(encodedTrack.arrayBuffer.slice(0));
+    const buffer = await actx.decodeAudioData(
+      encodedTracks.get(trackId).arrayBuffer.slice(0)
+    );
+    decodedBuffers.set(trackId, buffer);
+
+    if (!(loopDuration > 0)) {
+      loopDuration = buffer.duration;
+    } else {
+      const durationDifference = Math.abs(buffer.duration - loopDuration);
+      if (durationDifference > 1 / actx.sampleRate) {
+        console.warn(
+          `Synced BGM duration for ${trackId} differs by `
+          + `${durationDifference.toFixed(6)} seconds.`
+        );
+      }
+    }
+
+    return buffer;
+  }
+
+  async function loadActiveTrack() {
+    await preload();
+
+    // The selected mode can change while preload/decode is pending.
+    while (true) {
+      const requestedTrackId = activeTrackId;
+      const buffer = await decodeTrack(requestedTrackId);
+      if (requestedTrackId === activeTrackId) return buffer;
+      decodedBuffers.delete(requestedTrackId);
+    }
   }
 
   function load() {
     ensureAudioGraph();
     if (loadPromise) return loadPromise;
 
-    loadPromise = preload().then(() => Promise.all(
-      [...trackStates.values()].map(async (track) => {
-        track.buffer = await decodeTrack(track);
-        return track.buffer;
-      })
-    )).then((buffers) => {
-      loopDuration = Math.min(...buffers.map(({ duration }) => duration));
-      if (!(loopDuration > 0)) {
-        throw new Error('The synced BGM tracks contain no playable audio.');
-      }
-
-      const durationSpread = Math.max(...buffers.map(({ duration }) => duration)) - loopDuration;
-      if (durationSpread > 1 / actx.sampleRate) {
-        console.warn(
-          `Synced BGM durations differ by ${durationSpread.toFixed(6)} seconds. `
-          + `All tracks will loop at ${loopDuration.toFixed(6)} seconds.`
-        );
-      }
-
-      return { duration: loopDuration };
-    }).catch((error) => {
+    loadPromise = loadActiveTrack().then(() => ({
+      duration: loopDuration,
+    })).catch((error) => {
       loadPromise = null;
       throw error;
     });
-
     return loadPromise;
   }
 
-  function getCurrentTime() {
-    if (!isPlaying) return normalizeOffset(pausedOffset);
-    const elapsed = Math.max(0, actx.currentTime - startedAtContextTime);
-    return normalizeOffset(startOffset + elapsed);
+  function createSourceEntry(trackId, buffer, startAt, offset, initialGain) {
+    const gain = actx.createGain();
+    gain.gain.setValueAtTime(initialGain, actx.currentTime);
+    gain.connect(masterGain);
+
+    const source = actx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.loopStart = 0;
+    source.loopEnd = Math.min(loopDuration, buffer.duration);
+    source.connect(gain);
+    source.start(startAt, normalizeOffset(offset));
+    return { source, gain, trackId };
   }
 
-  function scheduleSources(offset) {
-    const normalizedOffset = normalizeOffset(offset);
+  function stopEntry(entry, when = 0) {
+    try {
+      entry.source.stop(when);
+    } catch (error) {
+      console.warn(error);
+    }
+    try {
+      entry.source.disconnect();
+      entry.gain.disconnect();
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  function scheduleInitialSource(buffer) {
     const startAt = actx.currentTime + 0.04;
-
+    const normalizedOffset = normalizeOffset(pausedOffset);
     masterGain.gain.cancelScheduledValues(actx.currentTime);
-    masterGain.gain.setValueAtTime(0, actx.currentTime);
-    masterGain.gain.setValueAtTime(1, startAt);
-    setTrackGains(0);
+    masterGain.gain.setValueAtTime(1, actx.currentTime);
 
-    sourceEntries = [...trackStates.values()].map((track) => {
-      const source = actx.createBufferSource();
-      source.buffer = track.buffer;
-      source.loop = true;
-      source.loopStart = 0;
-      source.loopEnd = loopDuration;
-      source.connect(track.gain);
-      source.start(startAt, normalizedOffset);
-      return { source, trackId: track.id };
-    });
-
+    sourceEntries = [
+      createSourceEntry(activeTrackId, buffer, startAt, normalizedOffset, 1),
+    ];
     startOffset = normalizedOffset;
     startedAtContextTime = startAt;
     isPlaying = true;
+  }
+
+  function waitUntilContextTime(contextTime) {
+    const waitMs = Math.max(0, (contextTime - actx.currentTime) * 1000);
+    return new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
+  async function crossfadeOnce(trackId, durationSec) {
+    const generation = transitionGeneration;
+    const buffer = await decodeTrack(trackId);
+    if (!isPlaying || generation !== transitionGeneration || trackId !== activeTrackId) {
+      if (!sourceEntries.some((entry) => entry.trackId === trackId)) {
+        decodedBuffers.delete(trackId);
+      }
+      return;
+    }
+
+    const duration = Math.max(0, durationSec);
+    const startAt = actx.currentTime + 0.04;
+    const endAt = startAt + duration;
+    const offsetAtStart = getCurrentTimeAt(startAt);
+    const outgoingEntries = sourceEntries.slice();
+    const incomingEntry = createSourceEntry(trackId, buffer, startAt, offsetAtStart, 0);
+    sourceEntries.push(incomingEntry);
+
+    outgoingEntries.forEach((entry) => {
+      entry.gain.gain.cancelScheduledValues(startAt);
+      entry.gain.gain.setValueAtTime(entry.gain.gain.value, startAt);
+      entry.gain.gain.linearRampToValueAtTime(0, endAt);
+      try {
+        entry.source.stop(endAt + 0.03);
+      } catch (error) {
+        console.warn(error);
+      }
+    });
+    incomingEntry.gain.gain.setValueAtTime(0, startAt);
+    incomingEntry.gain.gain.linearRampToValueAtTime(1, endAt);
+
+    await waitUntilContextTime(endAt + 0.04);
+    if (!isPlaying || generation !== transitionGeneration) return;
+
+    outgoingEntries.forEach((entry) => {
+      try {
+        entry.source.disconnect();
+        entry.gain.disconnect();
+      } catch (error) {
+        console.warn(error);
+      }
+      decodedBuffers.delete(entry.trackId);
+    });
+    sourceEntries = [incomingEntry];
+  }
+
+  function requestTransition() {
+    if (!isPlaying || transitionPromise) return;
+
+    transitionPromise = (async () => {
+      while (isPlaying) {
+        const currentTrackId = sourceEntries.length === 1
+          ? sourceEntries[0].trackId
+          : null;
+        if (currentTrackId === activeTrackId) break;
+
+        const requestedTrackId = activeTrackId;
+        await crossfadeOnce(requestedTrackId, requestedCrossfadeSec);
+      }
+    })().catch((error) => {
+      console.error('Unable to crossfade synchronized ROUND audio.', error);
+    }).finally(() => {
+      transitionPromise = null;
+      const currentTrackId = sourceEntries.length === 1
+        ? sourceEntries[0].trackId
+        : null;
+      if (isPlaying && currentTrackId !== activeTrackId) {
+        requestTransition();
+      }
+    });
   }
 
   async function play() {
     if (isPlaying) return;
     if (pendingPlay) return pendingPlay;
 
-    // This function is called directly by the pointer handler. Create and resume
-    // the context before the first async boundary so iOS recognizes the gesture.
+    // Both calls happen before the first async boundary.
     ensureAudioGraph();
+    const unlockPromise = unlockFromUserGesture();
+
     pendingPlay = (async () => {
+      await unlockPromise;
+      const buffer = await loadActiveTrack();
       if (actx.state !== 'running') await actx.resume();
-      await load();
-      if (actx.state !== 'running') await actx.resume();
-      if (!isPlaying) scheduleSources(pausedOffset);
+      if (!isPlaying) scheduleInitialSource(buffer);
     })().finally(() => {
       pendingPlay = null;
     });
@@ -205,24 +305,38 @@ export function createSyncedBgmPlayer({
 
     pausedOffset = getCurrentTime();
     isPlaying = false;
+    transitionGeneration += 1;
     const stopAt = actx.currentTime + 0.025;
 
-    holdParamAtCurrentValue(masterGain.gain, actx.currentTime);
+    masterGain.gain.cancelScheduledValues(actx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, actx.currentTime);
     masterGain.gain.linearRampToValueAtTime(0, stopAt);
-    sourceEntries.forEach(({ source }) => {
+    sourceEntries.forEach((entry) => {
       try {
-        source.stop(stopAt);
+        entry.source.stop(stopAt);
       } catch (error) {
         console.warn(error);
       }
     });
+
+    const retainedBuffer = decodedBuffers.get(activeTrackId);
+    decodedBuffers.clear();
+    if (retainedBuffer) decodedBuffers.set(activeTrackId, retainedBuffer);
     sourceEntries = [];
   }
 
   function setTrack(trackId, durationSec = defaultCrossfadeSec) {
     if (!trackIds.has(trackId)) return false;
     activeTrackId = trackId;
-    setTrackGains(durationSec);
+    requestedCrossfadeSec = Math.max(0, durationSec);
+
+    if (isPlaying) {
+      requestTransition();
+    } else {
+      const retainedBuffer = decodedBuffers.get(trackId);
+      decodedBuffers.clear();
+      if (retainedBuffer) decodedBuffers.set(trackId, retainedBuffer);
+    }
     return true;
   }
 
@@ -237,7 +351,10 @@ export function createSyncedBgmPlayer({
   function destroy() {
     if (!actx) return;
     if (isPlaying) pause();
-    trackStates.forEach(({ gain }) => gain.disconnect());
+    transitionGeneration += 1;
+    sourceEntries.forEach((entry) => stopEntry(entry));
+    sourceEntries = [];
+    decodedBuffers.clear();
     masterGain.disconnect();
     if (actx.state !== 'closed') actx.close().catch(console.warn);
   }
