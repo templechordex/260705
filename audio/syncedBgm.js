@@ -163,17 +163,6 @@ export function createSyncedBgmPlayer({
     });
   }
 
-  async function startMediaFromOffset(trackId, offset) {
-    const media = mediaFor(trackId);
-    await ensureMetadata(media);
-    const normalizedOffset = normalizeOffset(offset, trackId);
-    if (Math.abs(media.currentTime - normalizedOffset) > 0.001) {
-      media.currentTime = normalizedOffset;
-    }
-    await media.play();
-    return media;
-  }
-
   async function play() {
     if (isPlaying) return;
     if (pendingPlay) return pendingPlay;
