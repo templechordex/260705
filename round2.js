@@ -456,7 +456,7 @@ const syncedBgm = createSyncedBgmPlayer({
   initialTrackId: DEFAULT_SOUND_VARIANT,
   defaultCrossfadeSec: SOUND_VARIANT_CROSSFADE_SEC,
 });
-syncedBgm.load().catch(console.warn);
+syncedBgm.preload().catch(console.warn);
 
 function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SEC) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
@@ -470,9 +470,10 @@ async function toggleSongPlayback() {
   playbackTogglePending = true;
   try {
     if (!syncedBgm.isPlaying()) {
-      await syncedBgm.play();
+      // React immediately while the preloaded MP3 data is being decoded.
       setRoundAnimationPlaying(true);
       setSoundVariantButtonsVisible(true);
+      await syncedBgm.play();
     } else {
       syncedBgm.pause();
       setRoundAnimationPlaying(false);

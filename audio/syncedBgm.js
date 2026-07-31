@@ -14,17 +14,12 @@ export function createSyncedBgmPlayer({
   }
 
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    throw new Error('Web Audio API is not supported in this browser.');
-  }
-
-  const actx = new AudioContextClass();
-  const masterGain = actx.createGain();
-  masterGain.gain.value = 1;
-  masterGain.connect(actx.destination);
-
   const initialId = trackIds.has(initialTrackId) ? initialTrackId : tracks[0].id;
   let activeTrackId = initialId;
+  let actx = null;
+  let masterGain = null;
+  let trackStates = null;
+  let preloadPromise = null;
   let loadPromise = null;
   let loopDuration = 0;
   let isPlaying = false;
@@ -34,12 +29,30 @@ export function createSyncedBgmPlayer({
   let startedAtContextTime = 0;
   let pausedOffset = 0;
 
-  const trackStates = new Map(tracks.map((track) => {
-    const gain = actx.createGain();
-    gain.gain.value = track.id === activeTrackId ? 1 : 0;
-    gain.connect(masterGain);
-    return [track.id, { ...track, buffer: null, gain }];
-  }));
+  const encodedTracks = new Map(tracks.map((track) => [
+    track.id,
+    { ...track, arrayBuffer: null },
+  ]));
+
+  function ensureAudioGraph() {
+    if (actx) return;
+    if (!AudioContextClass) {
+      throw new Error('Web Audio API is not supported in this browser.');
+    }
+
+    // iOS/WebKit requires the AudioContext to be created from a user gesture.
+    actx = new AudioContextClass();
+    masterGain = actx.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(actx.destination);
+
+    trackStates = new Map(tracks.map((track) => {
+      const gain = actx.createGain();
+      gain.gain.value = track.id === activeTrackId ? 1 : 0;
+      gain.connect(masterGain);
+      return [track.id, { ...track, buffer: null, gain }];
+    }));
+  }
 
   function normalizeOffset(seconds) {
     if (!(loopDuration > 0)) return 0;
@@ -57,6 +70,7 @@ export function createSyncedBgmPlayer({
   }
 
   function setTrackGains(durationSec = 0) {
+    if (!actx || !trackStates) return;
     const now = actx.currentTime;
     const duration = Math.max(0, durationSec);
 
@@ -71,23 +85,49 @@ export function createSyncedBgmPlayer({
     });
   }
 
-  async function decodeTrack(track) {
+  async function fetchTrack(track) {
     const response = await fetch(track.url);
     if (!response.ok) {
       throw new Error(`Failed to load ${track.url}: HTTP ${response.status}`);
     }
-    return actx.decodeAudioData(await response.arrayBuffer());
+    track.arrayBuffer = await response.arrayBuffer();
+    return track.arrayBuffer;
+  }
+
+  function preload() {
+    if (preloadPromise) return preloadPromise;
+
+    preloadPromise = Promise.all(
+      [...encodedTracks.values()].map((track) => (
+        track.arrayBuffer ? track.arrayBuffer : fetchTrack(track)
+      ))
+    ).then(() => ({ preloaded: true })).catch((error) => {
+      preloadPromise = null;
+      throw error;
+    });
+
+    return preloadPromise;
+  }
+
+  async function decodeTrack(track) {
+    const encodedTrack = encodedTracks.get(track.id);
+    if (!encodedTrack?.arrayBuffer) {
+      throw new Error(`Track data was not preloaded for ${track.id}.`);
+    }
+    // Safari may detach the supplied ArrayBuffer while decoding, so decode a copy.
+    return actx.decodeAudioData(encodedTrack.arrayBuffer.slice(0));
   }
 
   function load() {
+    ensureAudioGraph();
     if (loadPromise) return loadPromise;
 
-    loadPromise = Promise.all(
+    loadPromise = preload().then(() => Promise.all(
       [...trackStates.values()].map(async (track) => {
         track.buffer = await decodeTrack(track);
         return track.buffer;
       })
-    ).then((buffers) => {
+    )).then((buffers) => {
       loopDuration = Math.min(...buffers.map(({ duration }) => duration));
       if (!(loopDuration > 0)) {
         throw new Error('The synced BGM tracks contain no playable audio.');
@@ -145,8 +185,10 @@ export function createSyncedBgmPlayer({
     if (isPlaying) return;
     if (pendingPlay) return pendingPlay;
 
+    // This function is called directly by the pointer handler. Create and resume
+    // the context before the first async boundary so iOS recognizes the gesture.
+    ensureAudioGraph();
     pendingPlay = (async () => {
-      // Resume immediately while this call is still inside the user gesture.
       if (actx.state !== 'running') await actx.resume();
       await load();
       if (actx.state !== 'running') await actx.resume();
@@ -159,7 +201,7 @@ export function createSyncedBgmPlayer({
   }
 
   function pause() {
-    if (!isPlaying) return;
+    if (!actx || !isPlaying) return;
 
     pausedOffset = getCurrentTime();
     isPlaying = false;
@@ -178,7 +220,7 @@ export function createSyncedBgmPlayer({
   }
 
   function setTrack(trackId, durationSec = defaultCrossfadeSec) {
-    if (!trackStates.has(trackId)) return false;
+    if (!trackIds.has(trackId)) return false;
     activeTrackId = trackId;
     setTrackGains(durationSec);
     return true;
@@ -193,6 +235,7 @@ export function createSyncedBgmPlayer({
   }
 
   function destroy() {
+    if (!actx) return;
     if (isPlaying) pause();
     trackStates.forEach(({ gain }) => gain.disconnect());
     masterGain.disconnect();
@@ -200,7 +243,8 @@ export function createSyncedBgmPlayer({
   }
 
   return {
-    actx,
+    get actx() { return actx; },
+    preload,
     load,
     play,
     pause,
