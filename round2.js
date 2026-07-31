@@ -6,7 +6,7 @@ import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geome
 import { createSceneCameraRenderer } from './core/scene.js';
 import { createLoadingManager } from './core/loadingScreen.js';
 import { createSignBoardPlane as createSharedSignBoardPlane, attachSignText as attachSharedSignText } from './ui/signBoard.js';
-import { createSyncedBgmPlayer } from './audio/syncedBgm.js?v=20260731-streaming';
+import { createPsyAudioGraph } from './audio/psyAudio.js';
 
 const { scene, camera, renderer } = createSceneCameraRenderer(THREE, {
   exposure: 0.9,
@@ -200,10 +200,9 @@ updateSoundVariantButtons();
 setSoundVariantButtonsVisible(false);
 
 function updateSoundProgressBar() {
-  const duration = syncedBgm.getDuration();
-  const progress = duration > 0
-    ? THREE.MathUtils.clamp(syncedBgm.getCurrentTime() / duration, 0, 1)
-    : 0;
+  const currentBgmElement = getActiveBgmElement?.() ?? psyElement;
+  const duration = Number.isFinite(currentBgmElement.duration) ? currentBgmElement.duration : 0;
+  const progress = duration > 0 ? THREE.MathUtils.clamp(currentBgmElement.currentTime / duration, 0, 1) : 0;
   soundProgressFill.scale.x = Math.max(progress, 0.0001);
   soundProgressFill.position.x = (progress - 1) * soundProgressConfig.width * 0.5;
 }
@@ -451,40 +450,50 @@ function buildPlaySoundText() {
   signPlaySoundText = attachSignText(signPlaySound, 'SOUND', 0.5, textMatWhite, 0.05);
 }
 
-const syncedBgm = createSyncedBgmPlayer({
-  tracks: soundVariantOptions,
-  initialTrackId: DEFAULT_SOUND_VARIANT,
-  defaultCrossfadeSec: SOUND_VARIANT_CROSSFADE_SEC,
+const {
+  actx,
+  psyElement,
+  bgmElements,
+  setBgmVariant,
+  playBgmElements,
+  pauseBgmElements,
+  getActiveBgmElement,
+  isBgmPlaying,
+} = createPsyAudioGraph({
+  bgmURL: 'audio/round.mp3',
+  bgmTracks: soundVariantOptions,
+  initialBgmTrackId: DEFAULT_SOUND_VARIANT,
 });
-syncedBgm.preload().catch(console.warn);
+setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
+
+function refreshSoundPlaybackState() {
+  const playing = isBgmPlaying();
+  setRoundAnimationPlaying(playing);
+  setSoundVariantButtonsVisible(playing);
+}
+[...new Set([psyElement, ...bgmElements.map(({ element }) => element)])].forEach((element) => {
+  element.addEventListener('play', refreshSoundPlaybackState);
+  element.addEventListener('playing', refreshSoundPlaybackState);
+  element.addEventListener('pause', refreshSoundPlaybackState);
+  element.addEventListener('ended', refreshSoundPlaybackState);
+  element.addEventListener('error', refreshSoundPlaybackState);
+});
 
 function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SEC) {
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
-  syncedBgm.setTrack(activeSoundVariant, crossfadeSec);
+  setBgmVariant(activeSoundVariant, crossfadeSec);
   updateSoundVariantButtons();
 }
-let playbackTogglePending = false;
-async function toggleSongPlayback() {
-  if (playbackTogglePending) return;
-  playbackTogglePending = true;
-  try {
-    if (!syncedBgm.isPlaying()) {
-      // React immediately while the preloaded MP3 data is being decoded.
-      setRoundAnimationPlaying(true);
-      setSoundVariantButtonsVisible(true);
-      await syncedBgm.play();
-    } else {
-      syncedBgm.pause();
-      setRoundAnimationPlaying(false);
-      setSoundVariantButtonsVisible(false);
-    }
-  } catch (error) {
-    console.error('Unable to play the synchronized ROUND audio.', error);
+function toggleSongPlayback() {
+  if (actx.state !== 'running') actx.resume();
+  if (!isBgmPlaying()) {
+    playBgmElements().catch(console.warn);
+  } else {
+    pauseBgmElements();
+    selectSoundVariant(DEFAULT_SOUND_VARIANT, 0);
     setRoundAnimationPlaying(false);
     setSoundVariantButtonsVisible(false);
-  } finally {
-    playbackTogglePending = false;
   }
 }
 
