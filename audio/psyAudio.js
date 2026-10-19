@@ -6,6 +6,7 @@ export function createPsyAudioGraph({
   bgmTracks = null,
   initialBgmTrackId = null,
   equalPowerBgmCrossfade = false,
+  synchronizeBgmVariants = false,
   reverbURL = 'audio/WireGrind2.wav',
 } = {}) {
   const actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -299,11 +300,23 @@ export function createPsyAudioGraph({
   }
 
   let nextBgmStartTime = null;
+  let bgmCrossfadeEndsAtMs = 0;
+  let nextBgmSyncCheckMs = 0;
+  const BGM_SYNC_INTERVAL_MS = 500;
+  const BGM_SYNC_TOLERANCE_SEC = 0.025;
 
-  function seekBgmElement(element, time) {
+  function getSafeBgmSeekTime(element, time) {
     const seekTime = Math.max(0, time);
+    if (Number.isFinite(element.duration) && element.duration > 0) {
+      return Math.min(seekTime, Math.max(0, element.duration - 0.001));
+    }
+    return seekTime;
+  }
+
+  function seekBgmElement(element, time, { precise = false } = {}) {
+    const seekTime = getSafeBgmSeekTime(element, time);
     try {
-      if (typeof element.fastSeek === 'function') {
+      if (!precise && typeof element.fastSeek === 'function') {
         element.fastSeek(seekTime);
       } else {
         element.currentTime = seekTime;
@@ -311,6 +324,22 @@ export function createPsyAudioGraph({
     } catch (error) {
       console.warn(error);
     }
+  }
+
+  function getBgmTimeOffset(element, referenceTime) {
+    let offset = element.currentTime - referenceTime;
+    if (Number.isFinite(element.duration) && element.duration > 0 && Math.abs(offset) > element.duration / 2) {
+      offset -= Math.sign(offset) * element.duration;
+    }
+    return offset;
+  }
+
+  function syncBgmElement(element, referenceTime, toleranceSec = 0) {
+    if (!Number.isFinite(referenceTime)) return false;
+    const offset = getBgmTimeOffset(element, referenceTime);
+    if (Number.isFinite(offset) && Math.abs(offset) <= toleranceSec) return false;
+    seekBgmElement(element, referenceTime, { precise: true });
+    return true;
   }
 
   function fadeBgmTrack(track, targetFrequency, targetGain, durationSec) {
@@ -337,7 +366,23 @@ export function createPsyAudioGraph({
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
+    const previousActiveElement = getActiveBgmElement();
+    const nextActiveTrack = bgmElements.find(({ id }) => id === activeId);
+    if (
+      synchronizeBgmVariants
+      && wasPlaying
+      && nextActiveTrack?.element !== previousActiveElement
+    ) {
+      // The incoming track is still silent here, so an exact seek can finish
+      // underneath the start of the fade without exposing a seek artifact.
+      syncBgmElement(nextActiveTrack.element, previousActiveElement.currentTime);
+    }
     activeBgmTrackId = activeId;
+    if (synchronizeBgmVariants) {
+      const nowMs = performance.now();
+      bgmCrossfadeEndsAtMs = nowMs + Math.max(0, durSec) * 1000;
+      nextBgmSyncCheckMs = bgmCrossfadeEndsAtMs + BGM_SYNC_INTERVAL_MS;
+    }
 
     bgmElements.forEach((track) => {
       const isActive = track.id === activeId;
@@ -349,14 +394,35 @@ export function createPsyAudioGraph({
     });
   }
 
-  function syncBgmElements(time = getActiveBgmElement().currentTime) {
+  function syncBgmElements(
+    time = getActiveBgmElement().currentTime,
+    { precise = synchronizeBgmVariants, toleranceSec = 0 } = {},
+  ) {
     bgmElements.forEach(({ element }) => {
-      if (Number.isFinite(element.duration) && element.duration > 0) {
-        seekBgmElement(element, Math.min(time, Math.max(0, element.duration - 0.05)));
+      if (precise) {
+        syncBgmElement(element, time, toleranceSec);
       } else {
         seekBgmElement(element, time);
       }
     });
+  }
+
+  function maintainBgmSync(nowMs = performance.now()) {
+    if (!synchronizeBgmVariants || !isBgmPlaying()) return 0;
+    if (nowMs < bgmCrossfadeEndsAtMs || nowMs < nextBgmSyncCheckMs) return 0;
+
+    nextBgmSyncCheckMs = nowMs + BGM_SYNC_INTERVAL_MS;
+    const activeElement = getActiveBgmElement();
+    const referenceTime = activeElement.currentTime;
+    let correctionCount = 0;
+    bgmElements.forEach(({ element }) => {
+      if (element === activeElement) return;
+      if (element.paused) element.play().catch(console.warn);
+      if (syncBgmElement(element, referenceTime, BGM_SYNC_TOLERANCE_SEC)) {
+        correctionCount += 1;
+      }
+    });
+    return correctionCount;
   }
 
   function playBgmElements() {
@@ -364,6 +430,9 @@ export function createPsyAudioGraph({
     const startTime = nextBgmStartTime ?? activeElement.currentTime;
     syncBgmElements(startTime);
     nextBgmStartTime = null;
+    if (synchronizeBgmVariants) {
+      nextBgmSyncCheckMs = performance.now() + BGM_SYNC_INTERVAL_MS;
+    }
     const playPromises = bgmElements.map((track) => {
       const active = track.element === activeElement;
       track.element.volume = 1.0;
@@ -381,6 +450,8 @@ export function createPsyAudioGraph({
 
   function pauseBgmElements() {
     nextBgmStartTime = 0;
+    bgmCrossfadeEndsAtMs = 0;
+    nextBgmSyncCheckMs = 0;
     bgmElements.forEach((track) => {
       track.element.pause();
       if (track.gain) track.gain.gain.setValueAtTime(0.0, actx.currentTime);
@@ -416,6 +487,7 @@ export function createPsyAudioGraph({
     bgmElements,
     setBgmVariant,
     syncBgmElements,
+    maintainBgmSync,
     playBgmElements,
     pauseBgmElements,
     getActiveBgmElement,
