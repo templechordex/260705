@@ -236,56 +236,6 @@ export function createPsyAudioGraph({
   }
 
   let nextBgmStartTime = null;
-  let activeTapeTransitionToken = null;
-  const mediaRateRampTokens = new WeakMap();
-
-  function setPreservesPitch(element, preservesPitch) {
-    if ('preservesPitch' in element) element.preservesPitch = preservesPitch;
-    if ('webkitPreservesPitch' in element) element.webkitPreservesPitch = preservesPitch;
-  }
-
-  function setMediaPlaybackRate(element, playbackRate) {
-    const safeRate = Math.min(4, Math.max(0.25, playbackRate));
-    element.playbackRate = safeRate;
-    element.defaultPlaybackRate = safeRate;
-  }
-
-  function rampMediaPlaybackRate(element, targetRate, durationSec) {
-    const safeTargetRate = Math.min(4, Math.max(0.25, targetRate));
-    const token = Symbol('mediaRateRamp');
-    mediaRateRampTokens.set(element, token);
-
-    if (durationSec <= 0) {
-      setMediaPlaybackRate(element, safeTargetRate);
-      return Promise.resolve(true);
-    }
-
-    const startRate = element.playbackRate;
-    const startMs = performance.now();
-    const durationMs = Math.max(1, durationSec * 1000);
-
-    return new Promise((resolve) => {
-      function step() {
-        if (mediaRateRampTokens.get(element) !== token) {
-          resolve(false);
-          return;
-        }
-
-        const rawProgress = Math.min((performance.now() - startMs) / durationMs, 1);
-        const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
-        setMediaPlaybackRate(element, startRate + (safeTargetRate - startRate) * easedProgress);
-
-        if (rawProgress < 1) {
-          setTimeout(step, 16);
-        } else {
-          setMediaPlaybackRate(element, safeTargetRate);
-          resolve(true);
-        }
-      }
-
-      step();
-    });
-  }
 
   function seekBgmElement(element, time) {
     const seekTime = Math.max(0, time);
@@ -354,121 +304,10 @@ export function createPsyAudioGraph({
     return Promise.allSettled(playPromises);
   }
 
-  function playActiveBgmElement() {
-    const activeTrack = bgmElements.find(({ id }) => id === activeBgmTrackId) ?? bgmElements[0];
-    const startTime = nextBgmStartTime ?? activeTrack.element.currentTime;
-    nextBgmStartTime = null;
-
-    bgmElements.forEach((track) => {
-      const active = track === activeTrack;
-      mediaRateRampTokens.delete(track.element);
-      setPreservesPitch(track.element, false);
-      setMediaPlaybackRate(track.element, 1);
-      track.element.volume = 1.0;
-
-      if (track.gain) rampParam(track.gain.gain, active ? 1.0 : 0.0, 0);
-      if (track.filter) rampParam(track.filter.frequency, active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, 0);
-
-      if (active) {
-        seekBgmElement(track.element, startTime);
-      } else {
-        track.element.pause();
-        seekBgmElement(track.element, startTime);
-      }
-    });
-
-    return Promise.allSettled([activeTrack.element.play()]);
-  }
-
-  async function transitionBgmVariantTape(activeId, {
-    stopDurationSec = 0.48,
-    startDurationSec = 0.58,
-    minimumPlaybackRate = 0.25,
-  } = {}) {
-    const targetTrack = bgmElements.find(({ id }) => id === activeId);
-    const outgoingTrack = bgmElements.find(({ id }) => id === activeBgmTrackId);
-    if (!targetTrack || !outgoingTrack) return false;
-    if (targetTrack === outgoingTrack) return true;
-
-    if (!isBgmPlaying()) {
-      activeBgmTrackId = activeId;
-      bgmElements.forEach((track) => {
-        const active = track === targetTrack;
-        if (track.gain) rampParam(track.gain.gain, active ? 1.0 : 0.0, 0);
-        if (track.filter) rampParam(track.filter.frequency, active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, 0);
-      });
-      return true;
-    }
-
-    const transitionToken = Symbol('tapeTransition');
-    activeTapeTransitionToken = transitionToken;
-    const minimumRate = Math.min(1, Math.max(0.25, minimumPlaybackRate));
-
-    setPreservesPitch(targetTrack.element, false);
-    setMediaPlaybackRate(targetTrack.element, minimumRate);
-    targetTrack.element.volume = 1.0;
-    seekBgmElement(targetTrack.element, outgoingTrack.element.currentTime);
-    if (targetTrack.gain) rampParam(targetTrack.gain.gain, 0.0, 0);
-    if (targetTrack.filter) rampParam(targetTrack.filter.frequency, MUTED_LOWPASS_FREQ, 0);
-
-    try {
-      await targetTrack.element.play();
-    } catch (error) {
-      console.warn(error);
-      setMediaPlaybackRate(targetTrack.element, 1);
-      activeTapeTransitionToken = null;
-      return false;
-    }
-
-    setPreservesPitch(outgoingTrack.element, false);
-    setMediaPlaybackRate(outgoingTrack.element, 1);
-    if (outgoingTrack.gain) rampParam(outgoingTrack.gain.gain, 0.0, stopDurationSec);
-    if (outgoingTrack.filter) rampParam(outgoingTrack.filter.frequency, 180, stopDurationSec);
-    await rampMediaPlaybackRate(outgoingTrack.element, minimumRate, stopDurationSec);
-
-    if (activeTapeTransitionToken !== transitionToken) return false;
-
-    const switchTime = outgoingTrack.element.currentTime;
-    outgoingTrack.element.pause();
-    setMediaPlaybackRate(outgoingTrack.element, 1);
-    if (outgoingTrack.gain) rampParam(outgoingTrack.gain.gain, 0.0, 0);
-    if (outgoingTrack.filter) rampParam(outgoingTrack.filter.frequency, MUTED_LOWPASS_FREQ, 0);
-
-    activeBgmTrackId = activeId;
-    bgmElements.forEach((track) => {
-      if (track === targetTrack) return;
-      track.element.pause();
-      setMediaPlaybackRate(track.element, 1);
-      if (track.gain) rampParam(track.gain.gain, 0.0, 0);
-      if (track.filter) rampParam(track.filter.frequency, MUTED_LOWPASS_FREQ, 0);
-    });
-
-    setMediaPlaybackRate(targetTrack.element, minimumRate);
-    seekBgmElement(targetTrack.element, switchTime);
-    if (targetTrack.gain) rampParam(targetTrack.gain.gain, 0.0, 0);
-    if (targetTrack.filter) rampParam(targetTrack.filter.frequency, 180, 0);
-
-    if (targetTrack.gain) rampParam(targetTrack.gain.gain, 1.0, startDurationSec);
-    if (targetTrack.filter) rampParam(targetTrack.filter.frequency, OPEN_LOWPASS_FREQ, startDurationSec);
-    await rampMediaPlaybackRate(targetTrack.element, 1.0, startDurationSec);
-
-    if (activeTapeTransitionToken !== transitionToken) return false;
-
-    setMediaPlaybackRate(targetTrack.element, 1);
-    if (targetTrack.gain) rampParam(targetTrack.gain.gain, 1.0, 0);
-    if (targetTrack.filter) rampParam(targetTrack.filter.frequency, OPEN_LOWPASS_FREQ, 0);
-    activeTapeTransitionToken = null;
-    return true;
-  }
-
   function pauseBgmElements() {
     nextBgmStartTime = 0;
-    activeTapeTransitionToken = null;
     bgmElements.forEach((track) => {
-      mediaRateRampTokens.delete(track.element);
       track.element.pause();
-      setPreservesPitch(track.element, false);
-      setMediaPlaybackRate(track.element, 1);
       if (track.gain) track.gain.gain.setValueAtTime(0.0, actx.currentTime);
       if (track.filter) track.filter.frequency.setValueAtTime(MUTED_LOWPASS_FREQ, actx.currentTime);
       seekBgmElement(track.element, 0);
@@ -503,8 +342,6 @@ export function createPsyAudioGraph({
     setBgmVariant,
     syncBgmElements,
     playBgmElements,
-    playActiveBgmElement,
-    transitionBgmVariantTape,
     pauseBgmElements,
     getActiveBgmElement,
     isBgmPlaying,
