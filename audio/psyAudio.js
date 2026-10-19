@@ -5,6 +5,7 @@ export function createPsyAudioGraph({
   bgmURL = 'audio/psy.mp3',
   bgmTracks = null,
   initialBgmTrackId = null,
+  equalPowerBgmCrossfade = false,
   reverbURL = 'audio/WireGrind2.wav',
 } = {}) {
   const actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -71,7 +72,9 @@ export function createPsyAudioGraph({
 
   const roundLowpassFilter = actx.createBiquadFilter();
   roundLowpassFilter.type = 'lowpass';
-  roundLowpassFilter.frequency.value = activeBgmTrackId === 'round' ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+  roundLowpassFilter.frequency.value = equalPowerBgmCrossfade || activeBgmTrackId === 'round'
+    ? OPEN_LOWPASS_FREQ
+    : MUTED_LOWPASS_FREQ;
   const bgmFilterById = new Map([
     ['round', roundLowpassFilter],
     ['round_dry', lowpassFilter1],
@@ -82,7 +85,9 @@ export function createPsyAudioGraph({
     const source = bgmSourceById.get(track.id) ?? actx.createMediaElementSource(track.element);
     const filter = bgmFilterById.get(track.id) ?? actx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = track.id === activeBgmTrackId ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
+    filter.frequency.value = equalPowerBgmCrossfade || track.id === activeBgmTrackId
+      ? OPEN_LOWPASS_FREQ
+      : MUTED_LOWPASS_FREQ;
     filter.Q.value = 0.0001;
     const gain = actx.createGain();
     gain.gain.value = track.id === activeBgmTrackId ? 1.0 : 0.0;
@@ -189,6 +194,60 @@ export function createPsyAudioGraph({
     param.linearRampToValueAtTime(targetValue, t0 + Math.max(0.001, durationSec));
   }
 
+  function equalPowerGain(startValue, targetValue, progress) {
+    const start = Math.min(1, Math.max(0, startValue));
+    const target = Math.min(1, Math.max(0, targetValue));
+    const amount = Math.min(1, Math.max(0, progress));
+    const power = start * start + (target * target - start * start) * amount;
+    return Math.sqrt(Math.max(0, power));
+  }
+
+  function manuallyRampGainEqualPower(param, targetValue, durationSec) {
+    const token = Symbol('equalPowerRamp');
+    manualRampTokens.set(param, token);
+    const startValue = param.value;
+    const startMs = performance.now();
+    const durationMs = Math.max(1, durationSec * 1000);
+
+    function step(nowMs) {
+      if (manualRampTokens.get(param) !== token) return;
+      const progress = Math.min((nowMs - startMs) / durationMs, 1);
+      param.setValueAtTime(equalPowerGain(startValue, targetValue, progress), actx.currentTime);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        param.setValueAtTime(targetValue, actx.currentTime);
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  function rampGainEqualPower(param, targetValue, durationSec) {
+    const t0 = actx.currentTime;
+    if (durationSec <= 0) {
+      manualRampTokens.delete(param);
+      param.cancelScheduledValues(t0);
+      param.setValueAtTime(targetValue, t0);
+      return;
+    }
+
+    cancelParamAutomation(param, t0);
+    const startValue = param.value;
+    if (isIOSAudio) {
+      manuallyRampGainEqualPower(param, targetValue, durationSec);
+      return;
+    }
+
+    manualRampTokens.delete(param);
+    const sampleCount = 128;
+    const curve = new Float32Array(sampleCount);
+    for (let i = 0; i < sampleCount; i++) {
+      curve[i] = equalPowerGain(startValue, targetValue, i / (sampleCount - 1));
+    }
+    param.setValueCurveAtTime(curve, t0, Math.max(0.001, durationSec));
+  }
+
   const ctrLowpassFilter1 = (freq, dur) => rampParam(lowpassFilter1.frequency, freq, dur);
   const ctrLowpassFilter2 = (freq, dur) => rampParam(lowpassFilter2.frequency, freq, dur);
   const setEchoSend = (v, durSec = 0.8) => rampParam(echoSendGain.gain, v, durSec);
@@ -213,8 +272,12 @@ export function createPsyAudioGraph({
       function step(nowMs) {
         if (bgmVolumeFadeTokens.get(element) !== token) return;
         const rawProgress = Math.min((nowMs - startMs) / durationMs, 1);
-        const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
-        element.volume = startValue + (clampedTarget - startValue) * easedProgress;
+        if (equalPowerBgmCrossfade) {
+          element.volume = equalPowerGain(startValue, clampedTarget, rawProgress);
+        } else {
+          const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+          element.volume = startValue + (clampedTarget - startValue) * easedProgress;
+        }
         if (rawProgress < 1) {
           requestAnimationFrame(step);
         } else {
@@ -252,9 +315,19 @@ export function createPsyAudioGraph({
 
   function fadeBgmTrack(track, targetFrequency, targetGain, durationSec) {
     track.element.volume = 1.0;
-    if (track.gain) rampParam(track.gain.gain, targetGain, durationSec);
+    if (track.gain) {
+      if (equalPowerBgmCrossfade) {
+        rampGainEqualPower(track.gain.gain, targetGain, durationSec);
+      } else {
+        rampParam(track.gain.gain, targetGain, durationSec);
+      }
+    }
     if (track.filter) {
-      rampParam(track.filter.frequency, targetFrequency, durationSec);
+      rampParam(
+        track.filter.frequency,
+        equalPowerBgmCrossfade ? OPEN_LOWPASS_FREQ : targetFrequency,
+        equalPowerBgmCrossfade ? 0 : durationSec,
+      );
       return Promise.resolve();
     }
     return fadeElementVolume(track.element, targetGain, durationSec);
@@ -266,14 +339,13 @@ export function createPsyAudioGraph({
     const wasPlaying = isBgmPlaying();
     activeBgmTrackId = activeId;
 
-    const filterFadeDurationSec = durSec;
     bgmElements.forEach((track) => {
       const isActive = track.id === activeId;
       const targetFrequency = isActive ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ;
       const targetGain = isActive ? 1.0 : 0.0;
       track.element.volume = 1.0;
       if (wasPlaying && track.element.paused) track.element.play().catch(console.warn);
-      fadeBgmTrack(track, targetFrequency, targetGain, filterFadeDurationSec);
+      fadeBgmTrack(track, targetFrequency, targetGain, durSec);
     });
   }
 
@@ -297,7 +369,10 @@ export function createPsyAudioGraph({
       track.element.volume = 1.0;
       if (track.gain) track.gain.gain.setValueAtTime(active ? 1.0 : 0.0, actx.currentTime);
       if (track.filter) {
-        track.filter.frequency.setValueAtTime(active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ, actx.currentTime);
+        track.filter.frequency.setValueAtTime(
+          equalPowerBgmCrossfade || active ? OPEN_LOWPASS_FREQ : MUTED_LOWPASS_FREQ,
+          actx.currentTime,
+        );
       }
       return track.element.play();
     });
