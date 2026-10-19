@@ -494,6 +494,7 @@ const {
   psyElement,
   bgmElements,
   setBgmVariant,
+  maintainBgmSync,
   playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
@@ -503,6 +504,7 @@ const {
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
   equalPowerBgmCrossfade: true,
+  synchronizeBgmVariants: true,
 });
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
@@ -587,6 +589,7 @@ function animate() {
   fillLight.intensity = 1.1 + Math.cos(tnow * 0.6) * 0.35;
   backLight.intensity = 2.1 + Math.sin(tnow * 0.7) * 0.45;
   updateSoundProgressBar();
+  maintainBgmSync();
   const roundFrameDelta = Math.min(dt, 0.05);
   if (isSoundPlaying) {
     const roundDelta = roundFrameDelta * ROUND_CONFIG.animationSpeed;
