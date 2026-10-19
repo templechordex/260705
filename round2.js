@@ -159,9 +159,9 @@ soundProgressFill.scale.x = 0.0001;
 soundProgressGroup.add(soundProgressFill);
 
 const soundVariantOptions = [
+  { id: 'round_roomy', label: 'DRY', url: 'audio/round_roomy.mp3' },
   { id: 'round', label: 'Center', url: 'audio/round.mp3' },
   { id: 'round_dry', label: 'Round A', url: 'audio/round_dry.mp3' },
-  { id: 'round_roomy', label: 'Round B', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
 const SOUND_VARIANT_CROSSFADE_SEC = 3.2;
@@ -173,7 +173,7 @@ const soundVariantButtons = soundVariantOptions.map((option, index) => {
     width: 5.6,
     height: 1.7,
     bg: 'rgba(8,18,32,0.42)',
-    glow: index === 0 ? '#ff66cc' : '#66ddff',
+    glow: option.id === DEFAULT_SOUND_VARIANT ? '#ff66cc' : '#66ddff',
   });
   button.position.set(signPlaySound.position.x + (index - 1) * 6.1, signPlaySound.position.y + 8.05, signPlaySound.position.z);
   button.userData.soundVariantId = option.id;
