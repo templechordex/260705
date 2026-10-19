@@ -238,7 +238,7 @@ const ROUND_CONFIG = {
 const ROUND_MOTION_MODES = {
   round: { rotationSpeed: 0, complexRotation: false },
   round_dry: { rotationSpeed: 1, complexRotation: false },
-  round_roomy: { rotationSpeed: 1.65, complexRotation: true },
+  round_roomy: { rotationSpeed: 0, complexRotation: false },
 };
 const roundGroup = new THREE.Group();
 roundGroup.position.set(ROUND_CONFIG.position.x, ROUND_CONFIG.position.y, ROUND_CONFIG.position.z);
@@ -347,6 +347,44 @@ function createRoundVisual() {
     roundPlanetGroup.add(frag);
   }
 }
+
+function setRoundVisualPalette(variantId) {
+  const useMonochrome = variantId === 'round_roomy';
+  const visitedMaterials = new Set();
+
+  roundGroup.traverse((object) => {
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      if (!material?.color || visitedMaterials.has(material)) return;
+      visitedMaterials.add(material);
+      if (material.userData.roundOriginalColor === undefined) {
+        material.userData.roundOriginalColor = material.color.getHex();
+      }
+      if (!useMonochrome) {
+        material.color.setHex(material.userData.roundOriginalColor);
+        return;
+      }
+
+      const original = new THREE.Color(material.userData.roundOriginalColor);
+      const luminance = original.r * 0.2126 + original.g * 0.7152 + original.b * 0.0722;
+      material.color.setRGB(luminance, luminance, luminance);
+    });
+
+    if (object.isLight && object.color) {
+      if (object.userData.roundOriginalColor === undefined) {
+        object.userData.roundOriginalColor = object.color.getHex();
+      }
+      if (useMonochrome) {
+        const original = new THREE.Color(object.userData.roundOriginalColor);
+        const luminance = original.r * 0.2126 + original.g * 0.7152 + original.b * 0.0722;
+        object.color.setRGB(luminance, luminance, luminance);
+      } else {
+        object.color.setHex(object.userData.roundOriginalColor);
+      }
+    }
+  });
+}
+
 function updateRoundAnimation(elapsedTime, deltaTime) {
   const motionMode = ROUND_MOTION_MODES[activeSoundVariant] ?? ROUND_MOTION_MODES.round;
   const motionDelta = deltaTime * motionMode.rotationSpeed;
@@ -442,6 +480,7 @@ function setRoundAnimationPlaying(playing) {
   isSoundPlaying = playing;
 }
 createRoundVisual();
+setRoundVisualPalette(activeSoundVariant);
 updateRoundAnimation(roundAnimationTime, 0);
 
 let signPlaySoundText = null;
@@ -463,6 +502,7 @@ const {
   bgmURL: 'audio/round.mp3',
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
+  equalPowerBgmCrossfade: true,
 });
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
@@ -483,6 +523,7 @@ function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SE
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, crossfadeSec);
+  setRoundVisualPalette(activeSoundVariant);
   updateSoundVariantButtons();
 }
 function toggleSongPlayback() {
