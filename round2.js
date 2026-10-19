@@ -159,9 +159,9 @@ soundProgressFill.scale.x = 0.0001;
 soundProgressGroup.add(soundProgressFill);
 
 const soundVariantOptions = [
-  { id: 'round_roomy', label: 'DRY', url: 'audio/round_roomy.mp3' },
   { id: 'round', label: 'Center', url: 'audio/round.mp3' },
   { id: 'round_dry', label: 'Round A', url: 'audio/round_dry.mp3' },
+  { id: 'round_roomy', label: 'Round B', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
 const SOUND_VARIANT_CROSSFADE_SEC = 3.2;
@@ -173,7 +173,7 @@ const soundVariantButtons = soundVariantOptions.map((option, index) => {
     width: 5.6,
     height: 1.7,
     bg: 'rgba(8,18,32,0.42)',
-    glow: option.id === DEFAULT_SOUND_VARIANT ? '#ff66cc' : '#66ddff',
+    glow: index === 0 ? '#ff66cc' : '#66ddff',
   });
   button.position.set(signPlaySound.position.x + (index - 1) * 6.1, signPlaySound.position.y + 8.05, signPlaySound.position.z);
   button.userData.soundVariantId = option.id;
@@ -238,7 +238,7 @@ const ROUND_CONFIG = {
 const ROUND_MOTION_MODES = {
   round: { rotationSpeed: 0, complexRotation: false },
   round_dry: { rotationSpeed: 1, complexRotation: false },
-  round_roomy: { rotationSpeed: 0, complexRotation: false },
+  round_roomy: { rotationSpeed: 1.65, complexRotation: true },
 };
 const roundGroup = new THREE.Group();
 roundGroup.position.set(ROUND_CONFIG.position.x, ROUND_CONFIG.position.y, ROUND_CONFIG.position.z);
@@ -347,44 +347,6 @@ function createRoundVisual() {
     roundPlanetGroup.add(frag);
   }
 }
-
-function setRoundVisualPalette(variantId) {
-  const useMonochrome = variantId === 'round_roomy';
-  const visitedMaterials = new Set();
-
-  roundGroup.traverse((object) => {
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material) => {
-      if (!material?.color || visitedMaterials.has(material)) return;
-      visitedMaterials.add(material);
-      if (material.userData.roundOriginalColor === undefined) {
-        material.userData.roundOriginalColor = material.color.getHex();
-      }
-      if (!useMonochrome) {
-        material.color.setHex(material.userData.roundOriginalColor);
-        return;
-      }
-
-      const original = new THREE.Color(material.userData.roundOriginalColor);
-      const luminance = original.r * 0.2126 + original.g * 0.7152 + original.b * 0.0722;
-      material.color.setRGB(luminance, luminance, luminance);
-    });
-
-    if (object.isLight && object.color) {
-      if (object.userData.roundOriginalColor === undefined) {
-        object.userData.roundOriginalColor = object.color.getHex();
-      }
-      if (useMonochrome) {
-        const original = new THREE.Color(object.userData.roundOriginalColor);
-        const luminance = original.r * 0.2126 + original.g * 0.7152 + original.b * 0.0722;
-        object.color.setRGB(luminance, luminance, luminance);
-      } else {
-        object.color.setHex(object.userData.roundOriginalColor);
-      }
-    }
-  });
-}
-
 function updateRoundAnimation(elapsedTime, deltaTime) {
   const motionMode = ROUND_MOTION_MODES[activeSoundVariant] ?? ROUND_MOTION_MODES.round;
   const motionDelta = deltaTime * motionMode.rotationSpeed;
@@ -480,7 +442,6 @@ function setRoundAnimationPlaying(playing) {
   isSoundPlaying = playing;
 }
 createRoundVisual();
-setRoundVisualPalette(activeSoundVariant);
 updateRoundAnimation(roundAnimationTime, 0);
 
 let signPlaySoundText = null;
@@ -494,7 +455,6 @@ const {
   psyElement,
   bgmElements,
   setBgmVariant,
-  maintainBgmSync,
   playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
@@ -503,8 +463,6 @@ const {
   bgmURL: 'audio/round.mp3',
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
-  equalPowerBgmCrossfade: true,
-  synchronizeBgmVariants: true,
 });
 setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
@@ -525,7 +483,6 @@ function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SE
   if (!soundVariantOptions.some((option) => option.id === variantId)) return;
   activeSoundVariant = variantId;
   setBgmVariant(activeSoundVariant, crossfadeSec);
-  setRoundVisualPalette(activeSoundVariant);
   updateSoundVariantButtons();
 }
 function toggleSongPlayback() {
@@ -589,7 +546,6 @@ function animate() {
   fillLight.intensity = 1.1 + Math.cos(tnow * 0.6) * 0.35;
   backLight.intensity = 2.1 + Math.sin(tnow * 0.7) * 0.45;
   updateSoundProgressBar();
-  maintainBgmSync();
   const roundFrameDelta = Math.min(dt, 0.05);
   if (isSoundPlaying) {
     const roundDelta = roundFrameDelta * ROUND_CONFIG.animationSpeed;
