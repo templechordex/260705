@@ -1,5 +1,5 @@
 // round2 diagnostic page: the audio controls remain, but all 3D rendering is disabled.
-import { createPsyAudioGraph } from './audio/psyAudio.js?v=20261019-tape1';
+import { createPsyAudioGraph } from './audio/psyAudio.js?v=20261019-fade1s';
 
 const soundVariantOptions = [
   { id: 'round', label: 'Center', url: 'audio/round.mp3' },
@@ -8,11 +8,7 @@ const soundVariantOptions = [
 ];
 
 const DEFAULT_SOUND_VARIANT = 'round';
-const TAPE_TRANSITION_OPTIONS = {
-  stopDurationSec: 0.48,
-  startDurationSec: 0.58,
-  minimumPlaybackRate: 0.25,
-};
+const SOUND_VARIANT_CROSSFADE_SEC = 1.0;
 
 const soundButton = document.querySelector('#sound-button');
 const modeControls = document.querySelector('#mode-controls');
@@ -22,15 +18,13 @@ const timeLabel = document.querySelector('#time-label');
 const status = document.querySelector('#status');
 
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
-let tapeTransitionActive = false;
 
 const {
   actx,
   psyElement,
   bgmElements,
   setBgmVariant,
-  playActiveBgmElement,
-  transitionBgmVariantTape,
+  playBgmElements,
   pauseBgmElements,
   getActiveBgmElement,
   isBgmPlaying,
@@ -66,42 +60,22 @@ function updateModeButtons() {
 }
 
 function refreshSoundPlaybackState() {
-  const playing = isBgmPlaying() || tapeTransitionActive;
+  const playing = isBgmPlaying();
   soundButton.textContent = playing ? 'STOP' : 'SOUND';
   soundButton.setAttribute('aria-pressed', String(playing));
   modeControls.hidden = !playing;
   updateProgress();
 }
 
-function setTapeTransitionActive(active) {
-  tapeTransitionActive = active;
-  soundButton.disabled = active;
-  modeControls.setAttribute('aria-busy', String(active));
-  modeButtons.forEach((button) => { button.disabled = active; });
-  refreshSoundPlaybackState();
-}
-
-async function selectSoundVariant(variantId) {
+function selectSoundVariant(variantId, crossfadeSec = SOUND_VARIANT_CROSSFADE_SEC) {
   const selectedOption = soundVariantOptions.find((option) => option.id === variantId);
-  if (!selectedOption || tapeTransitionActive || variantId === activeSoundVariant) return;
+  if (!selectedOption) return;
 
-  setTapeTransitionActive(true);
-  status.textContent = `Tape stop → ${selectedOption.label}`;
-
-  try {
-    const switched = await transitionBgmVariantTape(variantId, TAPE_TRANSITION_OPTIONS);
-    if (!switched) {
-      status.textContent = 'Mode change could not be completed.';
-      return;
-    }
-
-    activeSoundVariant = variantId;
-    updateModeButtons();
-    updateProgress();
-    status.textContent = `${selectedOption.label} mode`;
-  } finally {
-    setTapeTransitionActive(false);
-  }
+  activeSoundVariant = variantId;
+  setBgmVariant(activeSoundVariant, crossfadeSec);
+  updateModeButtons();
+  updateProgress();
+  status.textContent = `${selectedOption.label} mode`;
 }
 
 async function toggleSongPlayback() {
@@ -112,15 +86,13 @@ async function toggleSongPlayback() {
   }
 
   if (!isBgmPlaying()) {
-    const results = await playActiveBgmElement();
+    const results = await playBgmElements();
     if (results.every(({ status: resultStatus }) => resultStatus === 'rejected')) {
       status.textContent = 'Audio could not be played.';
     }
   } else {
     pauseBgmElements();
-    activeSoundVariant = DEFAULT_SOUND_VARIANT;
-    setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
-    updateModeButtons();
+    selectSoundVariant(DEFAULT_SOUND_VARIANT, 0);
     status.textContent = '';
   }
 
@@ -149,13 +121,7 @@ soundButton.addEventListener('click', () => {
 });
 
 modeButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    selectSoundVariant(button.dataset.variant).catch((error) => {
-      console.warn(error);
-      status.textContent = 'Mode change could not be completed.';
-      setTapeTransitionActive(false);
-    });
-  });
+  button.addEventListener('click', () => selectSoundVariant(button.dataset.variant));
 });
 
 updateModeButtons();
