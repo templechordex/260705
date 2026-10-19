@@ -2,22 +2,178 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>round2 - anji_TERAOKA_3D</title>
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
-    }
-  }
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>round2 - anji TERAOKA</title>
   <style>
-    html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
-    canvas { display: block; }
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #050505;
+      color: #f5f5f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; margin: 0; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: max(28px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom));
+      background: #050505;
+    }
+
+    main {
+      width: min(680px, 100%);
+      display: grid;
+      gap: 30px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: #858585;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+    }
+
+    h1 {
+      margin: 8px 0 0;
+      font-size: clamp(38px, 11vw, 78px);
+      font-weight: 300;
+      letter-spacing: 0.12em;
+    }
+
+    button, .stream-link {
+      min-height: 48px;
+      border: 1px solid #777;
+      border-radius: 999px;
+      color: #fff;
+      background: transparent;
+      font: inherit;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+    }
+
+    button:hover, button:focus-visible, .stream-link:hover, .stream-link:focus-visible {
+      border-color: #fff;
+      outline: none;
+    }
+
+    #sound-button {
+      width: min(280px, 100%);
+      margin-inline: auto;
+      padding: 15px 28px;
+      background: #f4f4f4;
+      color: #050505;
+      border-color: #f4f4f4;
+      font-size: 15px;
+    }
+
+    #sound-button[aria-pressed="true"] {
+      background: transparent;
+      color: #fff;
+    }
+
+    #mode-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    #mode-controls[hidden] { display: none; }
+
+    .mode-button { padding: 12px 8px; }
+
+    .mode-button[aria-pressed="true"] {
+      border-color: #fff;
+      background: #fff;
+      color: #050505;
+    }
+
+    .progress-wrap { display: grid; gap: 10px; }
+
+    #progress-track {
+      height: 3px;
+      overflow: hidden;
+      background: #292929;
+    }
+
+    #progress-fill {
+      width: 0%;
+      height: 100%;
+      background: #f5f5f5;
+    }
+
+    #time-label {
+      margin: 0;
+      color: #777;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.1em;
+    }
+
+    .streaming-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .stream-link {
+      min-width: 150px;
+      padding: 13px 18px;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    #status {
+      min-height: 1.4em;
+      margin: 0;
+      color: #777;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      main { gap: 24px; }
+      #mode-controls { grid-template-columns: 1fr; }
+      .streaming-links { display: grid; }
+    }
   </style>
 </head>
 <body>
+  <main>
+    <header>
+      <p class="eyebrow">3D RENDERING OFF</p>
+      <h1>ROUND</h1>
+    </header>
+
+    <button id="sound-button" type="button" aria-pressed="false">SOUND</button>
+
+    <div id="mode-controls" aria-label="Sound mode" hidden>
+      <button class="mode-button" type="button" data-variant="round" aria-pressed="true">Center</button>
+      <button class="mode-button" type="button" data-variant="round_dry" aria-pressed="false">Round A</button>
+      <button class="mode-button" type="button" data-variant="round_roomy" aria-pressed="false">Round B</button>
+    </div>
+
+    <div class="progress-wrap" aria-label="Playback progress">
+      <div id="progress-track"><div id="progress-fill"></div></div>
+      <p id="time-label">0:00 / 0:00</p>
+    </div>
+
+    <nav class="streaming-links" aria-label="Streaming links">
+      <a class="stream-link" href="https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS" target="_blank" rel="noopener noreferrer">Spotify</a>
+      <a class="stream-link" href="https://music.apple.com/us/artist/anji-teraoka/1538384131" target="_blank" rel="noopener noreferrer">Apple Music</a>
+    </nav>
+
+    <p id="status" aria-live="polite"></p>
+  </main>
+
   <script type="module" src="round2.js"></script>
 </body>
 </html>
