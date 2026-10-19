@@ -3,8 +3,8 @@ import { createPsyAudioGraph } from './audio/psyAudio.js?v=20261019-fade1s';
 
 const soundVariantOptions = [
   { id: 'round', label: 'Center', url: 'audio/round.mp3' },
-  { id: 'round_dry', label: 'Round A', url: 'audio/round_dry.mp3' },
-  { id: 'round_roomy', label: 'Round B', url: 'audio/round_roomy.mp3' },
+  { id: 'round_dry', label: 'Round', url: 'audio/round_dry.mp3' },
+  { id: 'round_roomy', label: 'Dry', url: 'audio/round_roomy.mp3' },
 ];
 
 const DEFAULT_SOUND_VARIANT = 'round';
