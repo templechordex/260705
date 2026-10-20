@@ -260,7 +260,7 @@ export function createPsyAudioGraph({
     return fadeElementVolume(track.element, targetGain, durationSec);
   }
 
-  function setBgmVariant(activeId, durSec = 3.2) {
+  function setBgmVariant(activeId, durSec = 1.5) {
     if (!bgmElements.some(({ id }) => id === activeId)) return;
 
     const wasPlaying = isBgmPlaying();
