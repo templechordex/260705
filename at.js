@@ -859,8 +859,11 @@ const soundVariantOptions = [
   { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
-const SOUND_VARIANT_CROSSFADE_SEC = 3.2;
+const SOUND_VARIANT_CROSSFADE_SEC = 1.5;
+const SOUND_VARIANT_LOCK_MS = 2000;
 let activeSoundVariant = DEFAULT_SOUND_VARIANT;
+let soundVariantSwitchLocked = false;
+let soundVariantLockTimer = null;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
   const button = createSignBoardPlane({
     width: 5.6,
@@ -881,9 +884,23 @@ let soundVariantTexts = [];
 function updateSoundVariantButtons() {
   soundVariantButtons.forEach((button) => {
     const active = button.userData.soundVariantId === activeSoundVariant;
-    button.material.opacity = active ? 0.86 : 0.54;
+    const disabled = soundVariantSwitchLocked && !active;
+    button.userData.soundVariantDisabled = disabled;
+    button.material.opacity = disabled ? 0.26 : (active ? 0.86 : 0.54);
+    button.material.color?.setHex(disabled ? 0x666666 : 0xffffff);
     button.scale.setScalar(1.0);
   });
+}
+
+function lockOtherSoundVariantButtons() {
+  soundVariantSwitchLocked = true;
+  if (soundVariantLockTimer) clearTimeout(soundVariantLockTimer);
+  updateSoundVariantButtons();
+  soundVariantLockTimer = setTimeout(() => {
+    soundVariantSwitchLocked = false;
+    soundVariantLockTimer = null;
+    updateSoundVariantButtons();
+  }, SOUND_VARIANT_LOCK_MS);
 }
 function setSoundVariantButtonsVisible(visible) {
   soundVariantButtons.forEach((button) => {
@@ -1411,8 +1428,10 @@ setBgmVariant(DEFAULT_SOUND_VARIANT, 0);
 
 function refreshSoundPlaybackState() {
   const playing = isBgmPlaying();
+  const playbackJustStarted = playing && !isSoundPlaying;
   setRoundAnimationPlaying(playing);
   setSoundVariantButtonsVisible(playing);
+  if (playbackJustStarted) lockOtherSoundVariantButtons();
 }
 
 [...new Set([psyElement, ...bgmElements.map(({ element }) => element)])].forEach((element) => {
@@ -1628,7 +1647,10 @@ function handleClick(event) {
     const obj = getClickableRoot(intersects1[0].object);
 
     if (isSoundPlaying && soundVariantButtons.includes(obj)) {
-      selectSoundVariant(obj.userData.soundVariantId);
+      if (!obj.userData.soundVariantDisabled && obj.userData.soundVariantId !== activeSoundVariant) {
+        selectSoundVariant(obj.userData.soundVariantId);
+        lockOtherSoundVariantButtons();
+      }
       handled = true;
 
     } else if (obj === buttonLeft) {
