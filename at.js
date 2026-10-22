@@ -777,7 +777,7 @@ const signAppleMusic = createSignBoardPlane({
 });
 signAppleMusic.position.set(
   signSongBack.position.x,
-  signSongBack.position.y + 3.0,
+  signSongBack.position.y + 2.2,
   -10
 );
 signAppleMusic.userData.externalUrl = 'https://music.apple.com/us/artist/anji-teraoka/1538384131';
