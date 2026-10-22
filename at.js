@@ -1116,7 +1116,6 @@ function createRoundVisual() {
 
 function updateRoundVisualMode() {
   const dry = activeSoundVariant === 'round_dry';
-  const basic = activeSoundVariant === 'round_roomy';
 
   roundGroup.traverse((obj) => {
     if (obj.isMesh) {
@@ -1132,16 +1131,19 @@ function updateRoundVisualMode() {
     roundGlowLight.color.setHex(dry ? ROUND_DRY_GRAY : roundGlowLight.userData.originalColor);
   }
 
-  roundBasicShapesGroup.visible = basic;
-  roundCore.visible = !basic;
-  roundCoreShell.visible = !basic;
-  roundMist.visible = !basic;
-  roundRings.forEach((ring) => { ring.visible = !basic; });
-  roundParticles.forEach((p) => { p.visible = !basic; });
-  roundFragments.forEach((frag) => { frag.visible = !basic; });
+  // All three modes share the same sculpture.
+  // Dry = monochrome Center, Center = drifting only, Round = rotating.
+  roundBasicShapesGroup.visible = false;
+  roundCore.visible = true;
+  roundCoreShell.visible = true;
+  roundMist.visible = true;
+  roundRings.forEach((ring) => { ring.visible = true; });
+  roundParticles.forEach((p) => { p.visible = true; });
+  roundFragments.forEach((frag) => { frag.visible = true; });
 }
 
 function updateRoundAnimation(elapsedTime, deltaTime) {
+  const rotating = activeSoundVariant === 'round_roomy';
   const slowPulse = Math.sin(elapsedTime * 0.75) * 0.5 + 0.5;
   const shellPulse = Math.sin(elapsedTime * 0.52 + 1.2) * 0.5 + 0.5;
   const mistPulse = Math.sin(elapsedTime * 0.33 + 2.1) * 0.5 + 0.5;
@@ -1154,43 +1156,41 @@ function updateRoundAnimation(elapsedTime, deltaTime) {
   roundCore.material.opacity = 0.58 + slowPulse * 0.22;
   roundCoreShell.scale.setScalar(0.92 + shellPulse * 0.28);
   roundCoreShell.material.opacity = 0.09 + shellPulse * 0.12;
-  roundMist.rotation.y += deltaTime * 0.045;
+  if (rotating) roundMist.rotation.y += deltaTime * 0.045;
   roundMist.material.opacity = 0.055 + mistPulse * 0.055;
   roundGlowLight.intensity = ROUND_CONFIG.centerGlowIntensity * (0.65 + slowPulse * 0.45);
 
   roundRings.forEach((ring, i) => {
-    ring.rotation.x += ring.userData.speed * deltaTime;
-    ring.rotation.y += ring.userData.speed * deltaTime * (0.55 + i * 0.08);
-    ring.rotation.z += Math.sin(elapsedTime * 0.18 + i) * ring.userData.wobble * deltaTime * 0.12;
+    if (rotating) {
+      ring.rotation.x += ring.userData.speed * deltaTime;
+      ring.rotation.y += ring.userData.speed * deltaTime * (0.55 + i * 0.08);
+      ring.rotation.z += Math.sin(elapsedTime * 0.18 + i) * ring.userData.wobble * deltaTime * 0.12;
+    }
   });
 
   roundParticles.forEach((p, i) => {
     const phase = p.userData.phase;
-    const orbit = phase + elapsedTime * p.userData.speed;
+    const orbit = rotating ? phase + elapsedTime * p.userData.speed : phase;
     const pull = Math.sin(elapsedTime * 0.27 + phase) * 0.22;
     let radius = p.userData.radius + pull;
     if (radius > 3.45) radius = 2.35 + (i % 7) * 0.08;
+    const driftY = rotating
+      ? Math.sin(orbit * 0.7 + p.userData.incline) * 0.55
+      : Math.sin(elapsedTime * 0.22 + phase) * 0.18 + Math.sin(phase * 0.7 + p.userData.incline) * 0.55;
     p.position.set(
       Math.cos(orbit) * radius,
-      Math.sin(orbit * 0.7 + p.userData.incline) * 0.55,
+      driftY,
       Math.sin(orbit) * radius * 0.38
     );
   });
 
-  if (roundBasicShapesGroup?.visible) {
-    roundBasicShapesGroup.children.forEach((shape, index) => {
-      const pulse = Math.sin(elapsedTime * 1.4 + shape.userData.phase) * 0.5 + 0.5;
-      shape.scale.setScalar(0.88 + pulse * 0.22);
-      shape.rotation.z += deltaTime * (index === 1 ? -0.32 : 0.24);
-    });
-  }
-
   roundFragments.forEach((frag) => {
     const phase = frag.userData.phase;
-    const orbit = phase + elapsedTime * frag.userData.speed;
-    const breathe = 0.78 + Math.sin(orbit * 1.7) * 0.18;
+    const orbit = rotating ? phase + elapsedTime * frag.userData.speed : phase;
+    const breathe = 0.78 + Math.sin(elapsedTime * 0.28 + phase) * 0.18;
     const x = Math.cos(orbit) * frag.userData.radiusX * breathe;
-    const y = Math.sin(orbit * 1.21) * frag.userData.radiusY;
+    const y = Math.sin(orbit * 1.21) * frag.userData.radiusY
+      + (rotating ? 0 : Math.sin(elapsedTime * 0.2 + phase) * 0.12);
     const z = Math.sin(orbit) * frag.userData.radiusX * 0.42 * breathe;
     const tilt = frag.userData.tilt;
     frag.position.set(
@@ -1198,11 +1198,12 @@ function updateRoundAnimation(elapsedTime, deltaTime) {
       y * Math.cos(tilt) - z * Math.sin(tilt),
       y * Math.sin(tilt) + z * Math.cos(tilt)
     );
-    frag.rotation.x += deltaTime * 0.21;
-    frag.rotation.y -= deltaTime * 0.16;
+    if (rotating) {
+      frag.rotation.x += deltaTime * 0.21;
+      frag.rotation.y -= deltaTime * 0.16;
+    }
   });
 }
-
 
 function updateRoundStopped(deltaTime) {
   const resetStep = Math.min(1, deltaTime * ROUND_CONFIG.resetScaleSpeed);
