@@ -764,6 +764,16 @@ signSpotify.position.set(
 signSpotify.userData.externalUrl = 'https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS';
 scene.add(signSpotify);
 
+const originalMixLabel = createSignBoardPlane({
+  width: 8.8, height: 1.2, bg: 'rgba(0,0,0,0)', glow: '#66ddff'
+});
+originalMixLabel.position.set(
+  signSpotify.position.x,
+  signSpotify.position.y + 2.0,
+  -10
+);
+scene.add(originalMixLabel);
+
 const signAppleMusic = createSignBoardPlane({
   width: 8.8, height: 2.2, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
 });
@@ -1232,6 +1242,7 @@ updateRoundAnimation(roundAnimationTime, 0);
 let signPlaySoundText = null;
 let signSongBackText = null;
 let signSpotifyText = null;
+let originalMixLabelText = null;
 let signAppleMusicText = null;
 function buildPlaySoundText() {
   if (!uiFont) return;
@@ -1243,6 +1254,9 @@ function buildPlaySoundText() {
   }
   if (!signSpotifyText) {
     signSpotifyText = attachSignText(signSpotify, 'SPOTIFY', 0.42, textMatWhite, 0.05);
+  }
+  if (!originalMixLabelText) {
+    originalMixLabelText = attachSignText(originalMixLabel, '↓ Original Mix ↓', 0.38, textMatWhite, 0.05);
   }
   if (!signAppleMusicText) {
     signAppleMusicText = attachSignText(signAppleMusic, 'APPLE MUSIC', 0.38, textMatWhite, 0.05);
