@@ -754,22 +754,22 @@ signSongBack.position.set(
 scene.add(signSongBack);
 
 const signSpotify = createSignBoardPlane({
-  width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff'
+  width: 8.8, height: 2.2, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff'
 });
 signSpotify.position.set(
-  signSongBack.position.x - 3.05,
-  signSongBack.position.y + 2.35,
+  signSongBack.position.x,
+  signSongBack.position.y + 5.0,
   -10
 );
 signSpotify.userData.externalUrl = 'https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS';
 scene.add(signSpotify);
 
 const signAppleMusic = createSignBoardPlane({
-  width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
+  width: 8.8, height: 2.2, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
 });
 signAppleMusic.position.set(
-  signSongBack.position.x + 3.05,
-  signSongBack.position.y + 2.35,
+  signSongBack.position.x,
+  signSongBack.position.y + 2.6,
   -10
 );
 signAppleMusic.userData.externalUrl = 'https://music.apple.com/us/artist/anji-teraoka/1538384131';
