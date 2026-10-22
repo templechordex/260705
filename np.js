@@ -219,16 +219,13 @@ function makeTextMesh(font, str, size) {
   return m;
 }
 
-// 画面上部のテキスト（menu / top）
+// TOP / MENU labels use the same neon sign-board style as the other UI buttons.
+let menuText = null;
+let topText = null;
 function buildTopTexts() {
   if (!uiFont) return;
-  const menu = makeTextMesh(uiFont, 'menu', 1.4);
-  menu.position.set(0, 3, -19);
-  scene.add(menu);
-
-  const top = makeTextMesh(uiFont, 'top', 1.4);
-  top.position.set(0, -3, -19);
-  scene.add(top);
+  if (!menuText) menuText = attachSignText(menuPlane, 'MENU', 0.5, textMatWhite, 0.05);
+  if (!topText) topText = attachSignText(topPlane, 'TOP', 0.5, textMatWhite, 0.05);
 }
 
 // バブル用ラベル（TextGeometry版）
@@ -311,31 +308,20 @@ addObjeToScene(scene);
 // --------------------------------------
 // Panes / planes
 // --------------------------------------
-const windowGlass1 = (() => {
-  const geo = new THREE.PlaneGeometry();
-  const mat = new THREE.MeshPhongMaterial({
-    color: 0x00ffff,
-    transparent: true,
-    opacity: 0.5,
-    shininess: 100,
-    side: THREE.DoubleSide
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(0, -3, -19);
-  mesh.scale.set(10, 5, 1);
-  scene.add(mesh);
-  return mesh;
-})();
+const topPlane = createSignBoardPlane({
+  width: 12.8, height: 2.2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+});
+topPlane.position.set(0, -3, -19);
+scene.add(topPlane);
 
-const menuPlane = (() => {
-  const geo = new THREE.PlaneGeometry();
-  const mat = new THREE.MeshBasicMaterial({ color: 0xe6e6fa });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(0, 0, -20);
-  mesh.scale.set(10, 10, 1);
-  scene.add(mesh);
-  return mesh;
-})();
+// Keep the legacy interaction name so the existing camera behavior remains intact.
+const windowGlass1 = topPlane;
+
+const menuPlane = createSignBoardPlane({
+  width: 12.8, height: 2.2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+});
+menuPlane.position.set(0, 3, -19);
+scene.add(menuPlane);
 
 // --------------------------------------
 // Flag (psychedelic shader for mesh surface)
