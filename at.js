@@ -730,7 +730,7 @@ scene.add(newSongArrowCue);
 let signNewSongText = null;
 function buildNewSongText() {
   if (!uiFont || signNewSongText) return;
-  signNewSongText = attachSignText(signNewSong, 'NEW SONG', 0.5, textMatWhite, 0.05);
+  signNewSongText = attachSignText(signNewSong, 'LISTEN to NEW SONG', 0.5, textMatWhite, 0.05);
 }
 
 // --------------------------------------
