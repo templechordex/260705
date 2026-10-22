@@ -667,7 +667,7 @@ scene.add(buttonLeft, buttonRight);
 // NEW SONG neon button (center-top UI)
 // --------------------------------------
 const signNewSong = createSignBoardPlane({
-  width: 8.8, height: 2.5, bg: 'rgba(8,18,32,0.55)', glow: '#66ddff'
+  width: 12.8, height: 2.2, bg: 'rgba(8,18,32,0.55)', glow: '#66ddff'
 });
 signNewSong.position.set(
   monitorScreen.position.x,
@@ -752,6 +752,28 @@ signSongBack.position.set(
   -10
 );
 scene.add(signSongBack);
+
+const signSpotify = createSignBoardPlane({
+  width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff'
+});
+signSpotify.position.set(
+  signSongBack.position.x - 3.05,
+  signSongBack.position.y + 2.35,
+  -10
+);
+signSpotify.userData.externalUrl = 'https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS';
+scene.add(signSpotify);
+
+const signAppleMusic = createSignBoardPlane({
+  width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
+});
+signAppleMusic.position.set(
+  signSongBack.position.x + 3.05,
+  signSongBack.position.y + 2.35,
+  -10
+);
+signAppleMusic.userData.externalUrl = 'https://music.apple.com/us/artist/anji-teraoka/1538384131';
+scene.add(signAppleMusic);
 
 function createRainbowHeadphoneGeometry() {
   const group = new THREE.Group();
@@ -1208,6 +1230,8 @@ updateRoundAnimation(roundAnimationTime, 0);
 
 let signPlaySoundText = null;
 let signSongBackText = null;
+let signSpotifyText = null;
+let signAppleMusicText = null;
 function buildPlaySoundText() {
   if (!uiFont) return;
   if (!signPlaySoundText) {
@@ -1215,6 +1239,12 @@ function buildPlaySoundText() {
   }
   if (!signSongBackText) {
     signSongBackText = attachSignText(signSongBack, 'BACK', 0.5, textMatWhite, 0.05);
+  }
+  if (!signSpotifyText) {
+    signSpotifyText = attachSignText(signSpotify, 'SPOTIFY', 0.42, textMatWhite, 0.05);
+  }
+  if (!signAppleMusicText) {
+    signAppleMusicText = attachSignText(signAppleMusic, 'APPLE MUSIC', 0.38, textMatWhite, 0.05);
   }
 }
 
@@ -1615,6 +1645,8 @@ const clickableA = [
   signNewSong,
   signPlaySound,
   signSongBack,
+  signSpotify,
+  signAppleMusic,
   signBackTop,
   signAbout,
   signPie,
@@ -1672,6 +1704,10 @@ function handleClick(event) {
 
     } else if (obj === signSongBack) {
       closeNewSongView();
+      handled = true;
+
+    } else if (obj === signSpotify || obj === signAppleMusic) {
+      window.open(obj.userData.externalUrl, '_blank', 'noopener,noreferrer');
       handled = true;
 
     } else if (obj === signAbout) {
