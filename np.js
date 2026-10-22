@@ -744,10 +744,13 @@ function animateSky(target, duration = 3000) {
 // --------------------------------------
 // 空変更
 // --------------------------------------
-function changeSky() {
+let isNightSky = false;
 
-  const elevation = 80;
-  const azimuth   = 180;
+function changeSky() {
+  isNightSky = !isNightSky;
+
+  const elevation = isNightSky ? -8 : 80;
+  const azimuth = 180;
 
   const targetSun = new THREE.Vector3();
   targetSun.setFromSphericalCoords(
@@ -756,13 +759,23 @@ function changeSky() {
     THREE.MathUtils.degToRad(azimuth)
   );
 
-  animateSky({
-    turbidity: 4,
-    rayleigh: 2,
-    mieCoefficient: 0.1,
-    mieDirectionalG: 0.988,
-    sunPosition: targetSun
-  }, 3000); // ←3秒
+  const target = isNightSky
+    ? {
+        turbidity: 10,
+        rayleigh: 0.08,
+        mieCoefficient: 0.02,
+        mieDirectionalG: 0.9,
+        sunPosition: targetSun
+      }
+    : {
+        turbidity: 4,
+        rayleigh: 2,
+        mieCoefficient: 0.1,
+        mieDirectionalG: 0.988,
+        sunPosition: targetSun
+      };
+
+  animateSky(target, 3000);
 }
 
 // --------------------------------------
