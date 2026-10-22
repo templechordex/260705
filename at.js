@@ -754,7 +754,7 @@ signSongBack.position.set(
 scene.add(signSongBack);
 
 const signSpotify = createSignBoardPlane({
-  width: 8.8, height: 2.2, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff'
+  width: 10.4, height: 2.7, bg: 'rgba(5,10,18,0.48)', glow: '#66ddff'
 });
 signSpotify.position.set(
   signSongBack.position.x,
@@ -767,17 +767,17 @@ scene.add(signSpotify);
 const originalMixLabel = new THREE.Group();
 originalMixLabel.position.set(
   signSpotify.position.x,
-  signSpotify.position.y + 2.0,
+  signSpotify.position.y + 2.35,
   -10
 );
 scene.add(originalMixLabel);
 
 const signAppleMusic = createSignBoardPlane({
-  width: 8.8, height: 2.2, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
+  width: 10.4, height: 2.7, bg: 'rgba(5,10,18,0.48)', glow: '#ff66cc'
 });
 signAppleMusic.position.set(
   signSongBack.position.x,
-  signSongBack.position.y + 2.6,
+  signSongBack.position.y + 3.0,
   -10
 );
 signAppleMusic.userData.externalUrl = 'https://music.apple.com/us/artist/anji-teraoka/1538384131';
@@ -1251,13 +1251,13 @@ function buildPlaySoundText() {
     signSongBackText = attachSignText(signSongBack, 'BACK', 0.5, textMatWhite, 0.05);
   }
   if (!signSpotifyText) {
-    signSpotifyText = attachSignText(signSpotify, 'SPOTIFY', 0.42, textMatWhite, 0.05);
+    signSpotifyText = attachSignText(signSpotify, 'SPOTIFY', 0.50, textMatWhite, 0.05);
   }
   if (!originalMixLabelText) {
-    originalMixLabelText = attachSignText(originalMixLabel, '↓ Original Mix ↓', 0.38, textMatWhite, 0.05);
+    originalMixLabelText = attachSignText(originalMixLabel, '↓ Original Mix ↓', 0.46, textMatWhite, 0.05);
   }
   if (!signAppleMusicText) {
-    signAppleMusicText = attachSignText(signAppleMusic, 'APPLE MUSIC', 0.38, textMatWhite, 0.05);
+    signAppleMusicText = attachSignText(signAppleMusic, 'APPLE MUSIC', 0.46, textMatWhite, 0.05);
   }
 }
 
