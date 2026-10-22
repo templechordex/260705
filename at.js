@@ -1325,6 +1325,9 @@ const signPie = createSignBoardPlane({
   width: 6.4, height: 2.1, bg: 'rgba(5,10,18,0.52)', glow: '#66ddff'
 });
 signPie.position.set(3.7, 3.0, -10);
+signPie.material.opacity = 0.22;
+signPie.material.color?.setHex(0x666666);
+signPie.userData.disabled = true;
 scene.add(signPie);
 
 let signBackTopText = null;
@@ -1730,7 +1733,7 @@ function handleClick(event) {
       handled = true;
 
     } else if (obj === signPie) {
-      requestNavigationAfterSoundStop(triggerPieAnimation);
+      // PIE is temporarily disabled.
       handled = true;
 
     } else if (obj === signBackTop) {
