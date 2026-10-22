@@ -224,8 +224,8 @@ let menuText = null;
 let topText = null;
 function buildTopTexts() {
   if (!uiFont) return;
-  if (!menuText) menuText = attachSignText(menuPlane, 'MENU', 0.5, textMatWhite, 0.05);
-  if (!topText) topText = attachSignText(topPlane, 'TOP', 0.5, textMatWhite, 0.05);
+  if (!menuText) menuText = attachSignText(menuPlane, 'MENU', 1.0, textMatWhite, 0.05);
+  if (!topText) topText = attachSignText(topPlane, 'TOP', 1.0, textMatWhite, 0.05);
 }
 
 // バブル用ラベル（TextGeometry版）
@@ -309,7 +309,7 @@ addObjeToScene(scene);
 // Panes / planes
 // --------------------------------------
 const topPlane = createSignBoardPlane({
-  width: 12.8, height: 2.2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+  width: 12.8, height: 6.6, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
 });
 topPlane.position.set(0, -3, -19);
 scene.add(topPlane);
@@ -318,7 +318,7 @@ scene.add(topPlane);
 const windowGlass1 = topPlane;
 
 const menuPlane = createSignBoardPlane({
-  width: 12.8, height: 2.2, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
+  width: 12.8, height: 6.6, bg: 'rgba(5,10,18,0.6)', glow: '#66ddff'
 });
 menuPlane.position.set(0, 3, -19);
 scene.add(menuPlane);
