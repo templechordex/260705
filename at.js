@@ -876,9 +876,9 @@ soundProgressGroup.add(soundProgressFill);
 // SOUND source switch (above playback position bar)
 // --------------------------------------
 const soundVariantOptions = [
-  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
   { id: 'round_dry', label: 'Dry', url: 'audio/round_dry.mp3' },
-  { id: 'round_roomy', label: 'Basic', url: 'audio/round_roomy.mp3' },
+  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
+  { id: 'round_roomy', label: 'Round', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
 const SOUND_VARIANT_CROSSFADE_SEC = 1.5;
