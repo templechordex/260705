@@ -764,9 +764,7 @@ signSpotify.position.set(
 signSpotify.userData.externalUrl = 'https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS';
 scene.add(signSpotify);
 
-const originalMixLabel = createSignBoardPlane({
-  width: 8.8, height: 1.2, bg: 'rgba(0,0,0,0)', glow: '#66ddff'
-});
+const originalMixLabel = new THREE.Group();
 originalMixLabel.position.set(
   signSpotify.position.x,
   signSpotify.position.y + 2.0,
