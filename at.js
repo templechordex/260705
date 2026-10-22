@@ -877,7 +877,7 @@ soundProgressGroup.add(soundProgressFill);
 // --------------------------------------
 const soundVariantOptions = [
   { id: 'round_dry', label: 'Dry', url: 'audio/round_dry.mp3' },
-  { id: 'round', label: 'Original', url: 'audio/round.mp3' },
+  { id: 'round', label: 'Center', url: 'audio/round.mp3' },
   { id: 'round_roomy', label: 'Round', url: 'audio/round_roomy.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
