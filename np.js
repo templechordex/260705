@@ -597,7 +597,8 @@ const clickableA = [
   signReturn,signReturn2,
   flagMesh,
   signS,
-  signA   // ←追加
+  signA,
+  signB
 ];
 const clickableObjects = clickableA.concat([bubble1, mBubble2, bubble3, bubble4, bubble5]);
 const clickableSet = new Set(clickableObjects);
@@ -699,6 +700,11 @@ function handleClick(event) {
           window.location.assign('./at.html');
         }, 2200);
       });
+      handled = true;
+
+    // ISH NURASをクリック → Instagram
+    } else if (obj === signB) {
+      window.open('https://www.instagram.com/ishunras/', '_blank');
       handled = true;
     }
   }
