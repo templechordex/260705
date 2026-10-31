@@ -761,7 +761,7 @@ signSpotify.position.set(
   signSongBack.position.y + 6.2,
   -10
 );
-signSpotify.userData.externalUrl = 'https://open.spotify.com/artist/31FfWVdW1IUmPgLoRbSGpS';
+signSpotify.userData.externalUrl = 'https://open.spotify.com/intl-ja/album/1w13nSFfZYgHv87kf3epLL';
 scene.add(signSpotify);
 
 const originalMixLabel = new THREE.Group();
@@ -780,7 +780,7 @@ signAppleMusic.position.set(
   signSongBack.position.y + 3.2,
   -10
 );
-signAppleMusic.userData.externalUrl = 'https://music.apple.com/us/artist/anji-teraoka/1538384131';
+signAppleMusic.userData.externalUrl = 'https://music.apple.com/jp/album/round/6807291290?i=6807291291';
 scene.add(signAppleMusic);
 
 function createRainbowHeadphoneGeometry() {
