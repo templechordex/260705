@@ -269,7 +269,7 @@ imgboxes.forEach((box) => {
 });
 
 const imgboxLabels = [
-  { title: '2ND SINGLE : Round', releaseDate: '2026.10.30' },
+  { title: '2ndSingle : Round', releaseDate: '2026.10.30' },
   { title: '1stEP : 10ド', releaseDate: '2022.12.09' },
   { title: '2ndAlbum : STARSHIP PIE', releaseDate: '2022.09.08' },
   { title: '1stSingle : Muzak', releaseDate: '2021.05.18' },
