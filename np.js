@@ -229,9 +229,11 @@ function buildTopTexts() {
 }
 
 // バブル用ラベル（TextGeometry版）
-let musicLabel = null;
-let webLabel   = null;
-let igLabel3D  = null;
+let musicLabel   = null;
+let webLabel     = null;
+let igLabel3D    = null;
+let threadsLabel = null;
+let xLabel       = null;
 
 function buildBubbleLabels() {
   if (!uiFont || !bubble1 || !mBubble2 || !bubble3) return;
@@ -251,11 +253,23 @@ function buildBubbleLabels() {
     igLabel3D.material = textMatWhite; // IGは白
     scene.add(igLabel3D);
   }
+  if (!threadsLabel) {
+    threadsLabel = makeTextMesh(uiFont, 'THREADS', 0.6);
+    threadsLabel.material = textMatWhite;
+    scene.add(threadsLabel);
+  }
+  if (!xLabel) {
+    xLabel = makeTextMesh(uiFont, 'X', 1.1);
+    xLabel.material = textMatWhite;
+    scene.add(xLabel);
+  }
 
   // 初期位置を各バブルの少し手前に（大きなバブルはさらに前）
   musicLabel.position.set(bubble1.position.x, bubble1.position.y, bubble1.position.z + 12);
   webLabel.position.set(mBubble2.position.x, mBubble2.position.y, mBubble2.position.z + 12);
   igLabel3D.position.set(bubble3.position.x, bubble3.position.y, bubble3.position.z + 6);
+  threadsLabel.position.set(bubble4.position.x, bubble4.position.y, bubble4.position.z + 6);
+  xLabel.position.set(bubble5.position.x, bubble5.position.y, bubble5.position.z + 6);
 }
 
 // 看板の板（Canvasで背景とフレームのみ）+ テキストはTextGeometryで前面に
@@ -634,6 +648,16 @@ function handleClick(event) {
       window.open('https://www.instagram.com/anji_teraoka/', '_blank');
       handled = true;
 
+    } else if (obj === bubble4) {
+      // bubble4 → 寺岡アンジ Threads（新しいタブ）
+      window.open('https://www.threads.com/@anji_teraoka', '_blank');
+      handled = true;
+
+    } else if (obj === bubble5) {
+      // bubble5 → 寺岡アンジ X（新しいタブ）
+      window.open('https://x.com/anji_teraoka', '_blank');
+      handled = true;
+
     } else if (obj === signReturn) {
       // ルーム内から地上（y&#8776;0）へ戻る
      animateCameraToPositionAndTarget(camera, new THREE.Vector3(0, 20, 20), new THREE.Vector3(0, 0, -1000), CAMERA_TWEEN_DURATION_MS);
@@ -828,6 +852,8 @@ function animate() {
     if (bubble1 && musicLabel)  musicLabel.position.set(bubble1.position.x,  bubble1.position.y,  bubble1.position.z  + 12);
     if (mBubble2 && webLabel)   webLabel.position.set(mBubble2.position.x,   mBubble2.position.y,   mBubble2.position.z + 12);
     if (bubble3 && igLabel3D)   igLabel3D.position.set(bubble3.position.x,   bubble3.position.y,    bubble3.position.z  + 6);
+    if (bubble4 && threadsLabel) threadsLabel.position.set(bubble4.position.x, bubble4.position.y, bubble4.position.z + 6);
+    if (bubble5 && xLabel)       xLabel.position.set(bubble5.position.x,       bubble5.position.y,       bubble5.position.z + 6);
   }
 
   // rising bubbles
