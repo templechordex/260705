@@ -885,7 +885,7 @@ soundProgressGroup.add(soundProgressFill);
 // --------------------------------------
 const soundVariantOptions = [
   { id: 'round_dry', label: 'Dry', url: 'audio/DryMIX_Round.mp3' },
-  { id: 'round', label: 'Center', url: 'audio/CenterMIX__Round.mp3' },
+  { id: 'round', label: 'Center', url: 'audio/CenterMIX_Round.mp3' },
   { id: 'round_roomy', label: 'Round', url: 'audio/RoundMIX_Round.mp3' },
 ];
 const DEFAULT_SOUND_VARIANT = 'round';
@@ -1466,7 +1466,7 @@ const {
   isBgmPlaying,
   setPsyAudio,
 } = createPsyAudioGraph({
-  bgmURL: 'audio/CenterMIX__Round.mp3',
+  bgmURL: 'audio/CenterMIX_Round.mp3',
   bgmTracks: soundVariantOptions,
   initialBgmTrackId: DEFAULT_SOUND_VARIANT,
 });
