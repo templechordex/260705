@@ -203,7 +203,7 @@ backLight.position.set(0, 28, 70);
 scene.add(backLight);
 
 // --------------------------------------
-// Spaceship Monitor: 新規シーン + imgbox1&#12316;3
+// Spaceship Monitor: discography images and labels
 // --------------------------------------
 
 // モニター専用の独立シーン（メインsceneとは別）
@@ -219,32 +219,57 @@ const monitorCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
 monitorCamera.position.set(0, 0, 30);
 monitorCamera.lookAt(0, 0, 0);
 
-// 画像を貼ったジオメトリを3つ作成するヘルパー
-function createImgBox(url, width = 12, height = 12) {
-  const tex = textureLoader.load(url, (t) => {
-    t.colorSpace = THREE.SRGBColorSpace;
-  });
+// Create a release cover. A neutral title card is displayed if artwork is not yet uploaded.
+function createImgBox(url, width = 12, height = 12, placeholderTitle = null) {
+  let placeholderTexture = null;
+  if (placeholderTitle) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#101725';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillStyle = '#f8fdff';
+    ctx.font = 'bold 76px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(placeholderTitle, 256, 256);
+    placeholderTexture = new THREE.CanvasTexture(canvas);
+    placeholderTexture.colorSpace = THREE.SRGBColorSpace;
+  }
+
   const geo = new THREE.PlaneGeometry(width, height);
-  const mat = new THREE.MeshBasicMaterial({ map: tex });
+  const mat = new THREE.MeshBasicMaterial({ map: placeholderTexture });
   const mesh = new THREE.Mesh(geo, mat);
+  const tex = textureLoader.load(url, (loadedTexture) => {
+    loadedTexture.colorSpace = THREE.SRGBColorSpace;
+    mat.map = loadedTexture;
+    mat.needsUpdate = true;
+    if (placeholderTexture) placeholderTexture.dispose();
+  }, undefined, () => {
+    if (placeholderTitle) console.warn(`Monitor artwork missing: ${url}`);
+  });
+  if (!placeholderTexture) {
+    mat.map = tex;
+    mat.needsUpdate = true;
+  }
   return mesh;
 }
 
-// 3つとも同じ位置に重ねて配置し、visibleで切り替える
+// Place all release covers at the same position, switching via visibility.
+const imgboxRound = createImgBox('img/round_jacket_300.jpg', 12, 12, 'Round');
 const imgbox1 = createImgBox('img/10do.jpg');
 const imgbox2 = createImgBox('img/ssp.jpg');
 const imgbox3 = createImgBox('img/mz.png');
 const imgbox4 = createImgBox('img/pm.jpg');
 
-imgbox1.position.set(0, 1.25, 0);
-imgbox2.position.set(0, 1.25, 0);
-imgbox3.position.set(0, 1.25, 0);
-imgbox4.position.set(0, 1.25, 0);
+const imgboxes = [imgboxRound, imgbox1, imgbox2, imgbox3, imgbox4];
+imgboxes.forEach((box) => {
+  box.position.set(0, 1.25, 0);
+  monitorScene.add(box);
+});
 
-monitorScene.add(imgbox1, imgbox2, imgbox3,imgbox4);
-
-const imgboxes = [imgbox1, imgbox2, imgbox3,imgbox4];
 const imgboxLabels = [
+  { title: '2ND SINGLE : Round', releaseDate: '2026.10.30' },
   { title: '1stEP : 10ド', releaseDate: '2022.12.09' },
   { title: '2ndAlbum : STARSHIP PIE', releaseDate: '2022.09.08' },
   { title: '1stSingle : Muzak', releaseDate: '2021.05.18' },
@@ -280,7 +305,7 @@ function hideAboutPopup() {
   aboutModal.style.display = 'none';
 }
 
-showImgbox(0); // 初期表示はimgbox1
+showImgbox(0); // 初期表示は最新リリース Round
 
 function createMonitorLabel(title, releaseDate, width = 24, height = 4) {
   const canvas = document.createElement('canvas');
