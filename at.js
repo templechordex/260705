@@ -3,7 +3,6 @@
 
 import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
 import { FontLoader }   from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/FontLoader.js';
-import { GLTFLoader }   from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { TextGeometry } from 'https://unpkg.com/three@0.180.0/examples/jsm/geometries/TextGeometry.js';
 
 // PostProcessing
@@ -140,7 +139,6 @@ const _v3c = new THREE.Vector3();
 const _raycaster = new THREE.Raycaster();
 const clock = new THREE.Clock();
 const textureLoader = new THREE.TextureLoader(loadingManager);
-const gltfLoader = new GLTFLoader(loadingManager);
 
 // --------------------------------------
 // Font (unified) + text helpers
@@ -768,37 +766,22 @@ signPlaySound.material.opacity = 0.72;
 signPlaySound.position.set(0, 100, -10);
 scene.add(signPlaySound);
 
-// The elephant from np.js sits above the Round player. Keep it small enough
-// to avoid covering the sound-mode buttons, and normalize the GLB's bounds
-// rather than depending on its original authoring scale.
-const roundElephantAnchor = new THREE.Group();
-roundElephantAnchor.position.set(
+// Lightweight PSY toggle replaces the 3D elephant above the Round controls.
+const signPsy = createSignBoardPlane({
+  width: 8.8, height: 2.6, bg: 'rgba(8,18,32,0.48)', glow: '#ff66cc'
+});
+signPsy.position.set(
   signPlaySound.position.x,
   signPlaySound.position.y + 17,
-  signPlaySound.position.z - 1.5
+  signPlaySound.position.z
 );
-scene.add(roundElephantAnchor);
-
-gltfLoader.load('model/ele.glb', (gltf) => {
-  const elephant = gltf.scene;
-  elephant.rotation.y = Math.PI / 2; // Same orientation as the np.js elephant.
-  elephant.updateMatrixWorld(true);
-
-  const bounds = new THREE.Box3().setFromObject(elephant);
-  const size = bounds.getSize(new THREE.Vector3());
-  if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
-    console.warn('Round elephant: invalid model bounds');
-    return;
-  }
-
-  const fitScale = Math.min(10.5 / size.x, 7.2 / size.y, 8 / size.z);
-  elephant.scale.multiplyScalar(fitScale);
-  elephant.updateMatrixWorld(true);
-  const centeredBounds = new THREE.Box3().setFromObject(elephant);
-  elephant.position.sub(centeredBounds.getCenter(new THREE.Vector3()));
-
-  roundElephantAnchor.add(elephant);
-}, undefined, (error) => console.error('Round elephant failed to load', error));
+scene.add(signPsy);
+const psyButtonTextMaterial = new THREE.MeshBasicMaterial({ color: 0xa0a0b0 });
+function updatePsyButtonAppearance() {
+  signPsy.material.opacity = psyOn ? 0.96 : 0.45;
+  psyButtonTextMaterial.color.setHex(psyOn ? 0xffffff : 0xa0a0b0);
+}
+updatePsyButtonAppearance();
 
 const signSongBack = createSignBoardPlane({
   width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#9fb7ff'
@@ -1294,6 +1277,7 @@ createRoundVisual();
 updateRoundVisualMode();
 updateRoundAnimation(roundAnimationTime, 0);
 
+let signPsyText = null;
 let signPlaySoundText = null;
 let signSongBackText = null;
 let signSpotifyText = null;
@@ -1301,6 +1285,9 @@ let originalMixLabelText = null;
 let signAppleMusicText = null;
 function buildPlaySoundText() {
   if (!uiFont) return;
+  if (!signPsyText) {
+    signPsyText = attachSignText(signPsy, 'PSY', 0.62, psyButtonTextMaterial, 0.05);
+  }
   if (!signPlaySoundText) {
     signPlaySoundText = attachSignText(signPlaySound, 'SOUND', 0.5, textMatWhite, 0.05);
   }
@@ -1717,7 +1704,7 @@ function animateCameraToPositionAndTarget(cam, targetPos, targetLookAt, duration
 const clickableA = [
   signNewSong,
   signPlaySound,
-  roundElephantAnchor,
+  signPsy,
   signSongBack,
   signSpotify,
   signAppleMusic,
@@ -1776,11 +1763,12 @@ function handleClick(event) {
       toggleSongPlayback();
       handled = true;
 
-    } else if (obj === roundElephantAnchor) {
-      // Same visual + audio psychedelic toggle as the elephant in np.js.
+    } else if (obj === signPsy) {
+      // Toggle psychedelic visuals and audio FX together.
       psyOn = !psyOn;
       psyPass.enabled = psyOn;
       setPsyAudio(psyOn);
+      updatePsyButtonAppearance();
       handled = true;
 
     } else if (obj === signSongBack) {
