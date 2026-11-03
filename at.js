@@ -766,20 +766,118 @@ signPlaySound.material.opacity = 0.72;
 signPlaySound.position.set(0, 100, -10);
 scene.add(signPlaySound);
 
-// Lightweight PSY toggle replaces the 3D elephant above the Round controls.
-const signPsy = createSignBoardPlane({
-  width: 8.8, height: 2.6, bg: 'rgba(8,18,32,0.48)', glow: '#ff66cc'
-});
+// Geometry-based buttons: the visible shape is also the raycast hit area.
+function makeShapedButton(kind, width, height, outlineColor) {
+  const shape = new THREE.Shape();
+  const hw = width / 2;
+  const hh = height / 2;
+  if (kind === 'triangle') {
+    // Equilateral triangle with its centroid at the text origin.
+    const triangleHeight = width * Math.sqrt(3) / 2;
+    shape.moveTo(0, triangleHeight * 2 / 3);
+    shape.lineTo(hw, -triangleHeight / 3);
+    shape.lineTo(-hw, -triangleHeight / 3);
+    shape.closePath();
+  } else if (kind === 'square') {
+    shape.moveTo(-hw, -hw);
+    shape.lineTo(hw, -hw);
+    shape.lineTo(hw, hw);
+    shape.lineTo(-hw, hw);
+    shape.closePath();
+  } else if (kind === 'circle') {
+    shape.absarc(0, 0, hw, 0, Math.PI * 2, false);
+  } else if (kind === 'capsule') {
+    const r = hh;
+    shape.moveTo(-hw + r, -hh);
+    shape.lineTo(hw - r, -hh);
+    shape.absarc(hw - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
+    shape.lineTo(-hw + r, hh);
+    shape.absarc(-hw + r, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+    shape.closePath();
+  }
+
+  const button = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0x152239, transparent: true, opacity: 0.9,
+      depthWrite: false, side: THREE.DoubleSide,
+    })
+  );
+  const outline = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(shape.getPoints(48)),
+    new THREE.LineBasicMaterial({
+      color: outlineColor, transparent: true, opacity: 0.8,
+      depthWrite: false,
+    })
+  );
+  outline.position.z = 0.035;
+  button.add(outline);
+  const halo = new THREE.LineLoop(
+    outline.geometry,
+    new THREE.LineBasicMaterial({
+      color: outlineColor, transparent: true, opacity: 0.26,
+      depthWrite: false,
+    })
+  );
+  halo.scale.set(1.035, 1.035, 1);
+  halo.position.z = 0.02;
+  button.add(halo);
+  button.userData.outlineMaterial = outline.material;
+  button.userData.haloMaterial = halo.material;
+  return button;
+}
+
+// A split, two-colour medicine capsule replaces the 3D elephant.
+const signPsy = makeShapedButton('capsule', 8.8, 3.6, 0xff66cc);
 signPsy.position.set(
   signPlaySound.position.x,
   signPlaySound.position.y + 17,
   signPlaySound.position.z
 );
 scene.add(signPsy);
+
+const capsuleHalfWidth = 4.4;
+const capsuleRadius = 1.8;
+const capStraightEnd = capsuleHalfWidth - capsuleRadius;
+const leftCapsuleHalf = new THREE.Shape();
+leftCapsuleHalf.moveTo(0, -capsuleRadius);
+leftCapsuleHalf.lineTo(0, capsuleRadius);
+leftCapsuleHalf.lineTo(-capStraightEnd, capsuleRadius);
+leftCapsuleHalf.absarc(-capStraightEnd, 0, capsuleRadius, Math.PI / 2, Math.PI * 1.5, false);
+leftCapsuleHalf.closePath();
+const rightCapsuleHalf = new THREE.Shape();
+rightCapsuleHalf.moveTo(0, -capsuleRadius);
+rightCapsuleHalf.lineTo(capStraightEnd, -capsuleRadius);
+rightCapsuleHalf.absarc(capStraightEnd, 0, capsuleRadius, -Math.PI / 2, Math.PI / 2, false);
+rightCapsuleHalf.lineTo(0, capsuleRadius);
+rightCapsuleHalf.closePath();
+const capsuleHalfMaterials = [
+  new THREE.MeshBasicMaterial({ color: 0xff66cc, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide }),
+  new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide }),
+];
+[leftCapsuleHalf, rightCapsuleHalf].forEach((half, index) => {
+  const panel = new THREE.Mesh(new THREE.ShapeGeometry(half, 32), capsuleHalfMaterials[index]);
+  panel.position.z = 0.01;
+  signPsy.add(panel);
+});
+const capsuleSeam = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, -capsuleRadius * 0.91, 0),
+    new THREE.Vector3(0, capsuleRadius * 0.91, 0),
+  ]),
+  new THREE.LineBasicMaterial({ color: 0xe9eaff, transparent: true, opacity: 0.35, depthWrite: false })
+);
+capsuleSeam.position.z = 0.04;
+signPsy.add(capsuleSeam);
+
 const psyButtonTextMaterial = new THREE.MeshBasicMaterial({ color: 0xa0a0b0 });
 function updatePsyButtonAppearance() {
-  signPsy.material.opacity = psyOn ? 0.96 : 0.45;
-  psyButtonTextMaterial.color.setHex(psyOn ? 0xffffff : 0xa0a0b0);
+  signPsy.material.opacity = psyOn ? 0.97 : 0.72;
+  signPsy.userData.outlineMaterial.opacity = psyOn ? 1.0 : 0.64;
+  signPsy.userData.haloMaterial.opacity = psyOn ? 0.55 : 0.2;
+  capsuleHalfMaterials.forEach((material) => { material.opacity = psyOn ? 0.8 : 0.24; });
+  capsuleSeam.material.opacity = psyOn ? 0.8 : 0.35;
+  psyButtonTextMaterial.color.setHex(psyOn ? 0xffffff : 0xc3c3d4);
 }
 updatePsyButtonAppearance();
 
@@ -935,12 +1033,9 @@ let activeSoundVariant = DEFAULT_SOUND_VARIANT;
 let soundVariantSwitchLocked = false;
 let soundVariantLockTimer = null;
 const soundVariantButtons = soundVariantOptions.map((option, index) => {
-  const button = createSignBoardPlane({
-    width: 5.6,
-    height: 1.7,
-    bg: 'rgba(8,18,32,0.42)',
-    glow: index === 0 ? '#ff66cc' : '#66ddff',
-  });
+  const kind = ['triangle', 'square', 'circle'][index];
+  const button = makeShapedButton(kind, index === 0 ? 5.2 : 4.7, 4.7,
+    index === 0 ? 0xff66cc : 0x66ddff);
   button.position.set(
     signPlaySound.position.x + (index - 1) * 6.1,
     signPlaySound.position.y + 8.05,
@@ -956,8 +1051,10 @@ function updateSoundVariantButtons() {
     const active = button.userData.soundVariantId === activeSoundVariant;
     const disabled = soundVariantSwitchLocked && !active;
     button.userData.soundVariantDisabled = disabled;
-    button.material.opacity = disabled ? 0.26 : (active ? 0.86 : 0.54);
-    button.material.color?.setHex(disabled ? 0x666666 : 0xffffff);
+    button.material.opacity = disabled ? 0.28 : (active ? 0.96 : 0.7);
+    button.material.color.setHex(disabled ? 0x222630 : (active ? 0x24435a : 0x152239));
+    button.userData.outlineMaterial.opacity = disabled ? 0.22 : (active ? 1 : 0.7);
+    button.userData.haloMaterial.opacity = disabled ? 0.05 : (active ? 0.55 : 0.2);
     button.scale.setScalar(1.0);
   });
 }
