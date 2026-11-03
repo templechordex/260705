@@ -768,6 +768,38 @@ signPlaySound.material.opacity = 0.72;
 signPlaySound.position.set(0, 100, -10);
 scene.add(signPlaySound);
 
+// The elephant from np.js sits above the Round player. Keep it small enough
+// to avoid covering the sound-mode buttons, and normalize the GLB's bounds
+// rather than depending on its original authoring scale.
+const roundElephantAnchor = new THREE.Group();
+roundElephantAnchor.position.set(
+  signPlaySound.position.x,
+  signPlaySound.position.y + 17,
+  signPlaySound.position.z - 1.5
+);
+scene.add(roundElephantAnchor);
+
+gltfLoader.load('model/ele.glb', (gltf) => {
+  const elephant = gltf.scene;
+  elephant.rotation.y = Math.PI / 2; // Same orientation as the np.js elephant.
+  elephant.updateMatrixWorld(true);
+
+  const bounds = new THREE.Box3().setFromObject(elephant);
+  const size = bounds.getSize(new THREE.Vector3());
+  if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
+    console.warn('Round elephant: invalid model bounds');
+    return;
+  }
+
+  const fitScale = Math.min(10.5 / size.x, 7.2 / size.y, 8 / size.z);
+  elephant.scale.multiplyScalar(fitScale);
+  elephant.updateMatrixWorld(true);
+  const centeredBounds = new THREE.Box3().setFromObject(elephant);
+  elephant.position.sub(centeredBounds.getCenter(new THREE.Vector3()));
+
+  roundElephantAnchor.add(elephant);
+}, undefined, (error) => console.error('Round elephant failed to load', error));
+
 const signSongBack = createSignBoardPlane({
   width: 5.6, height: 1.7, bg: 'rgba(5,10,18,0.48)', glow: '#9fb7ff'
 });
@@ -1685,6 +1717,7 @@ function animateCameraToPositionAndTarget(cam, targetPos, targetLookAt, duration
 const clickableA = [
   signNewSong,
   signPlaySound,
+  roundElephantAnchor,
   signSongBack,
   signSpotify,
   signAppleMusic,
@@ -1741,6 +1774,13 @@ function handleClick(event) {
     } else if (obj === signPlaySound) {
       // 上部エリアの SOUND ネオンで round 系トラックを再生/停止
       toggleSongPlayback();
+      handled = true;
+
+    } else if (obj === roundElephantAnchor) {
+      // Same visual + audio psychedelic toggle as the elephant in np.js.
+      psyOn = !psyOn;
+      psyPass.enabled = psyOn;
+      setPsyAudio(psyOn);
       handled = true;
 
     } else if (obj === signSongBack) {
