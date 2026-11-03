@@ -1562,10 +1562,10 @@ aboutModal.innerHTML = `
     <h2 style="margin: 0 0 8px; font-size: clamp(16px, 3vw, 22px); line-height: 1.12; text-align: center;">寺岡アンジ / ANJI TERAOKA</h2>
     <p style="margin: 0 0 28px; color: #9feeff; font-size: clamp(16px, 3vw, 22px); font-weight: 700; text-align: center;">ABOUT</p>
     <p style="margin: 0 0 18px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65;">
-      愛知県一宮市出身。音響・録音系専門学校の卒業を機に上京。2020年から寺岡アンジ名義で音源制作を開始。宅録を中心に、日本語歌詞のサイケデリック・ポップ／ロック等の音楽を制作しています。
+      寺岡アンジは、宅録を中心に活動するソロアーティスト。日本語の歌詞とサイケデリックな音響表現を組み合わせたポップ／ロックを制作している。2020年より活動。
     </p>
     <p lang="en" style="margin: 0 0 34px; font-size: clamp(15px, 2.6vw, 19px); line-height: 1.65; color: #d9f8ff;">
-      I mainly create home-recorded psychedelic pop/rock and other music with Japanese lyrics.
+      Anji Teraoka is a solo artist who primarily records music at home. He creates pop/rock that combines Japanese lyrics with psychedelic sonic textures. Active since 2020.
     </p>
     <div style="text-align: center;">
       <button type="button" data-about-close style="
