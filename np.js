@@ -704,7 +704,7 @@ function handleClick(event) {
 
     // ISH NURASをクリック → Instagram
     } else if (obj === signB) {
-      window.open('https://www.instagram.com/ishunras/', '_blank');
+      window.open('https://www.instagram.com/ishnuras', '_blank');
       handled = true;
     }
   }
